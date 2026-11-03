@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Newspaper PDF Combiner</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f6f7fb;font-family:Arial,sans-serif;color:#222}
+    .box{width:min(680px,100%);background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:30px;box-shadow:0 15px 45px rgba(0,0,0,.08)}
+    h1{margin:0 0 10px;font-size:28px}
+    p{color:#666;line-height:1.6}
+    button{width:100%;margin-top:12px;padding:15px;border:0;border-radius:12px;background:#8f1728;color:#fff;font-size:16px;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    progress{width:100%;height:12px;margin-top:20px}
+    #status{margin-top:12px;white-space:pre-wrap;font-size:14px;color:#444}
+    .warn{font-size:12px;margin-top:18px;color:#777}
+  </style>
+</head>
+<body>
+<div class="box">
+  <h1>Prabhat Khabar — Ranchi</h1>
+  <p>06 Oct 2026 · 16 pages</p>
+  <button id="btn">Combine & Download PDF</button>
+  <progress id="progress" value="0" max="16"></progress>
+  <div id="status">Ready</div>
+  <p class="warn">
+    This single HTML file can merge the PDFs only if the source server allows browser cross-origin fetching.
+    A local HTML file cannot make itself the newspaper site's origin or bypass the browser's CORS policy.
+  </p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const BASE = "https://cdnimg.prabhatkhabar.com/pdf/";
+const pages = [
+"2026/10/06/rnc/ran/01/05oct26_pk_rnc_ran_1_r1.pdf_20261005192953_1604b6fe71.pdf",
+"2026/10/06/rnc/ran/02/05oct26_pk_rnc_ran_2_r1_20261005192953_e4bd283d2c.pdf",
+"2026/10/06/rnc/ran/03/05oct26_pk_rnc_ran_3_r1.pdf_20261005192953_d5ad4e8c5d.pdf",
+"2026/10/06/rnc/ran/04/05oct26_pk_rnc_ran_4_r1_20261005192953_8bca5b5e6e.pdf",
+"2026/10/06/rnc/ran/05/05oct26_pk_rnc_ran_5_r1.pdf_20261005192953_c0f865e365.pdf",
+"2026/10/06/rnc/ran/06/05oct26_pk_rnc_ran_6_r1_20261005192953_a49eefb3b0.pdf",
+"2026/10/06/rnc/ran/07/05oct26_pk_rnc_ran_7_r1_20261005192953_80e5c09a15.pdf",
+"2026/10/06/rnc/ran/08/05oct26_pk_rnc_ran_8_r1.pdf_20261005192953_ebfac3a412.pdf",
+"2026/10/06/rnc/ran/09/05oct26_pk_rnc_ran_9_r1_20261005192953_d7b39e243c.pdf",
+"2026/10/06/rnc/ran/10/05oct26_pk_rnc_ran_10_r1.pdf_20261005192953_a35d7ffe26.pdf",
+"2026/10/06/rnc/ran/11/05oct26_pk_rnc_ran_11_r1.pdf_20261005192953_0863496f7d.pdf",
+"2026/10/06/rnc/ran/12/05oct26_pk_rnc_ran_12_r1_20261005192953_70e4fbf662.pdf",
+"2026/10/06/rnc/ran/13/05oct26_pk_rnc_ran_13_r2.pdf_20261005192953_006d03cf5b.pdf",
+"2026/10/06/rnc/ran/14/05oct26_pk_rnc_ran_14_r1.pdf_20261005192953_ae3291edae.pdf",
+"2026/10/06/rnc/ran/15/05oct26_pk_rnc_ran_15_r1.pdf_20261005192953_4fd9f29812.pdf",
+"2026/10/06/rnc/ran/16/05oct26_pk_rnc_ran_16_r1.pdf_20261005192953_6a146caad2.pdf"
+];
+
+const btn = document.getElementById("btn");
+const status = document.getElementById("status");
+const progress = document.getElementById("progress");
+
+btn.onclick = async () => {
+  btn.disabled = true;
+  progress.value = 0;
+  try {
+    if (!window.PDFLib) throw new Error("PDF library could not load.");
+    const merged = await PDFLib.PDFDocument.create();
+
+    for (let i = 0; i < pages.length; i++) {
+      status.textContent = `Downloading page ${i+1}/${pages.length}...`;
+      const res = await fetch(BASE + pages[i], { mode: "cors", cache: "no-store" });
+      if (!res.ok) throw new Error(`Page ${i+1}: HTTP ${res.status}`);
+      const source = await PDFLib.PDFDocument.load(await res.arrayBuffer());
+      const copied = await merged.copyPages(source, source.getPageIndices());
+      copied.forEach(p => merged.addPage(p));
+      progress.value = i + 1;
+    }
+
+    status.textContent = "Combining pages...";
+    const bytes = await merged.save();
+    const blob = new Blob([bytes], {type:"application/pdf"});
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = "Prabhat-Khabar-Ranchi-06-10-2026.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+    status.textContent = "Done.";
+  } catch (e) {
+    status.textContent =
+      "Browser blocked the PDF request.\n\n" +
+      (e && e.message ? e.message : e) +
+      "\n\nBecause this is a standalone HTML file, it cannot become the source website's origin. If direct fetch is blocked, a server-side endpoint is required.";
+  } finally {
+    btn.disabled = false;
+  }
+};
+</script>
+</body>
+</html>
