@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import "../layout";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -9,20 +8,19 @@ export const metadata: Metadata = {
   description: "Fresh cakes, pastries and custom celebration cakes.",
 };
 
-export default function RootLayout({
+
+export default function MainLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="bg-[#fff9f6] text-[#211816]">
-        <Navbar />
+    <>
+      <Navbar />
 
-        <main>{children}</main>
+      <main>{children}</main>
 
-        <Footer />
-      </body>
-    </html>
+      <Footer />
+    </>
   );
 }
