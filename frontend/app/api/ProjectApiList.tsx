@@ -1,3 +1,5 @@
+import { p } from "framer-motion/client";
+
 const ProjectApiList = {
   // Auth
   LOGIN: "/login",
@@ -10,6 +12,8 @@ const ProjectApiList = {
 
   // Categories
   GET_CATEGORIES: "/categories",
+
+  L: "/klf",
 
   // Cart
   GET_CART: "/cart",
