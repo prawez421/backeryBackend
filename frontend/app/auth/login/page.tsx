@@ -1,41 +1,108 @@
+
 "use client";
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+import axiosInstance, {
+  saveToken,
+  saveUser,
+} from "@/app/api/axiosInstance";
+
+import ProjectApiList from "@/app/api/ProjectApiList";
 
 export default function LoginPage() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
 
     if (!email.trim() || !password.trim()) {
-      setError("Please enter your email and password.");
+      toast.error("Please enter your email and password.");
       return;
     }
 
     setLoading(true);
 
-    // Abhi frontend demo hai. Backend API yahan connect hogi.
-    console.log({
-      email,
-      password,
-      rememberMe,
-    });
+    try {
+      const response = await axiosInstance.post(
+        ProjectApiList.login,
+        {
+          email: email.trim(),
+          password,
+          remember: rememberMe,
+        }
+      );
 
-    setLoading(false);
+      const token =
+        response.data.access_token ?? response.data.token;
+
+      const user = response.data.user;
+
+      if (!token) {
+        toast.error("Login response mein token nahi mila.");
+        return;
+      }
+
+      saveToken(token);
+
+      if (user) {
+        saveUser(user);
+      }
+
+      toast.success("Login successful!");
+
+      router.push("/inventory");
+
+    } catch (err: unknown) {
+      console.error("Login Error:", err);
+
+      if (typeof err === "object" && err !== null && "response" in err) {
+        const axiosError = err as {
+          response?: {
+            data?: {
+              errors?: Record<string, string[]>;
+              message?: string;
+            };
+          };
+        };
+
+        const data = axiosError.response?.data;
+
+        if (data?.errors) {
+          const firstKey = Object.keys(data.errors)[0];
+
+          toast.error(
+            data.errors[firstKey]?.[0] ||
+            "Please check your input."
+          );
+        } else if (data?.message) {
+          toast.error(data.message);
+        } else {
+          toast.error("Invalid email or password.");
+        }
+      } else {
+        toast.error(
+          "Something went wrong. Please check your backend connection."
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#fff8f3] px-4 py-10">
+    <main className="flex min-h-screen items-center justify-center bg-[#fff8f3] px-4 py-10">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-        {/* Logo */}
+
         <div className="mb-8 text-center">
           <Link
             href="/"
@@ -49,27 +116,18 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Heading */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Login</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Login
+          </h1>
+
           <p className="mt-1 text-sm text-gray-500">
             Enter your email and password to continue.
           </p>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div
-            role="alert"
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600"
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Email */}
+
           <div>
             <label
               htmlFor="email"
@@ -85,11 +143,11 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               autoComplete="email"
+              required
               className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-[#8b4513] focus:ring-2 focus:ring-[#8b4513]/20"
             />
           </div>
 
-          {/* Password */}
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label
@@ -115,6 +173,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 autoComplete="current-password"
+                required
                 className="w-full rounded-lg border border-gray-300 px-4 py-3 pr-20 text-sm outline-none transition focus:border-[#8b4513] focus:ring-2 focus:ring-[#8b4513]/20"
               />
 
@@ -128,7 +187,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Remember Me */}
           <div className="flex items-center">
             <input
               id="rememberMe"
@@ -146,7 +204,6 @@ export default function LoginPage() {
             </label>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
@@ -156,7 +213,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Register Link */}
         <p className="mt-6 text-center text-sm text-gray-600">
           Don&apos;t have an account?{" "}
           <Link
@@ -167,7 +223,6 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        {/* Back to Home */}
         <div className="mt-5 text-center">
           <Link
             href="/"
@@ -176,6 +231,7 @@ export default function LoginPage() {
             ← Back to Home
           </Link>
         </div>
+
       </div>
     </main>
   );

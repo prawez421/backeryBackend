@@ -15,8 +15,16 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('phone')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            
+            // String column for roles (flexible for any custom roles like admin, user, vendor, etc.)
+            $table->string('role')->default('user');
+            
+            // Status for active/inactive state
+            $table->boolean('status')->default(true); // true = active, false = inactive
+
             $table->rememberToken();
             $table->timestamps();
         });

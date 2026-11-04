@@ -1,5 +1,11 @@
 import "./globals.css";
+import type { Metadata } from "next";
+import ToastProvider from "@/components/common/ToastProvider";
 
+export const metadata: Metadata = {
+  title: "Cake House",
+  description: "Bakery Management System",
+};
 
 export default function RootLayout({
   children,
@@ -8,8 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-[#fff9f6] text-[#211816]">
+      <body>
         {children}
+        <ToastProvider />
       </body>
     </html>
   );
