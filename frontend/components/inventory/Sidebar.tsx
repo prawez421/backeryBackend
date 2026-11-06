@@ -43,11 +43,12 @@ type SidebarProps = {
 };
 
 const masterItems = [
-{ label: "Vendor Master", href: "/inventory/vendors", icon: Truck },
-  { label: "Product Master", href: "/inventory/products", icon: Package },
-  { label: "Category Master", href: "/inventory/categories", icon: Tags },
+{ label: "Vendor Master", href: "/inventory/vendor", icon: Truck },
+{ label: "Unit Master", href: "/inventory/units", icon: Ruler },
+{ label: "Category Master", href: "/inventory/category", icon: Tags },
+{ label: "Sub Category Master", href: "/inventory/sub_category", icon: Tags },
   { label: "Attribute Master", href: "/inventory/attributes", icon: Settings2 },
-  { label: "Unit Master", href: "/inventory/units", icon: Ruler },
+  { label: "Product Master", href: "/inventory/products", icon: Package },
   { label: "Raw Material Master", href: "/inventory/raw-materials", icon: Layers },
   { label: "Recipe Master", href: "/inventory/recipes", icon: ChefHat },
 ];
@@ -124,7 +125,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="flex h-20 items-center justify-between border-b border-orange-100 px-5">
           <Link
-            href="/inventory/dashboard"
+            href="/inventory"
             onClick={onClose}
             className="flex items-center gap-2"
           >
@@ -159,10 +160,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           {/* Dashboard */}
           <Link
-            href="/inventory/dashboard"
+            href="/inventory"
             onClick={onClose}
             className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium ${
-              pathname === "/inventory/dashboard"
+              pathname === "/inventory"
                 ? "bg-orange-500 text-white"
                 : "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
             }`}

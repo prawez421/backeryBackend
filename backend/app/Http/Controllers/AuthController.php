@@ -69,7 +69,7 @@ class AuthController extends Controller
             'access_token' => $token,
             'token_type' => 'Bearer',
             'user'  => $user
-        ]);
+        ], 200);
     }
 
     // user logout
@@ -80,6 +80,6 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Logged out successfully'
-        ]);
+        ] , 200);
     }
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import Navbar from "@/components/main/Navbar";
+import Footer from "@/components/main/Footer";
 
 export const metadata: Metadata = {
   title: "Cake House Motera",
