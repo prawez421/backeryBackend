@@ -11,6 +11,8 @@ use Illuminate\Database\QueryException;
 class CategoryController extends Controller
 {
     // GET: Category List
+
+    
     public function index()
     {
         $categories = Category::latest()->get();

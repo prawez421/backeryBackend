@@ -43,14 +43,14 @@ type SidebarProps = {
 };
 
 const masterItems = [
-{ label: "Vendor Master", href: "/inventory/vendor", icon: Truck },
-{ label: "Unit Master", href: "/inventory/units", icon: Ruler },
-{ label: "Category Master", href: "/inventory/category", icon: Tags },
-{ label: "Sub Category Master", href: "/inventory/sub_category", icon: Tags },
-  { label: "Attribute Master", href: "/inventory/attributes", icon: Settings2 },
-  { label: "Product Master", href: "/inventory/products", icon: Package },
-  { label: "Raw Material Master", href: "/inventory/raw-materials", icon: Layers },
-  { label: "Recipe Master", href: "/inventory/recipes", icon: ChefHat },
+{ label: "Vendor Master", href: "/inventory/master_setup/vendor", icon: Truck },
+{ label: "Unit Master", href: "/inventory/master_setup/units", icon: Ruler },
+{ label: "Category Master", href: "/inventory/master_setup/category", icon: Tags },
+{ label: "Sub Category Master", href: "/inventory/master_setup/sub_category", icon: Tags },
+  { label: "Attribute Master", href: "/inventory/master_setup/attributes", icon: Settings2 },
+  { label: "Product Master", href: "/inventory/master_setup/products", icon: Package },
+  { label: "Raw Material Master", href: "/inventory/master_setup/raw-materials", icon: Layers },
+  { label: "Recipe Master", href: "/inventory/master_setup/recipes", icon: ChefHat },
 ];
 
 const menuItems = [

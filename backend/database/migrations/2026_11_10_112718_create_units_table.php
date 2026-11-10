@@ -11,6 +11,14 @@ return new class extends Migration
     {
         Schema::create('units', function (Blueprint $table) {
             $table->id();
+             // Unique Vendor ID
+            $table->string('unique_id', 50)->unique();
+
+            // Branch Relationship
+            $table->foreignId('branch_id')
+                ->constrained('branches')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
 
             // Unit Information
             $table->string('unit_name', 100);

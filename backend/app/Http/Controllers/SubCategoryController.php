@@ -4,29 +4,29 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\SubCategory;
+use App\Models\Category;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class SubCategoryController extends Controller
 {
     // GET: All Sub Categories
-    public function index()
+ public function index()
 {
-    $subCategories = SubCategory::with([
-        'category' => function ($query) {
-            $query->where('status', 'Active');
-        }
-    ])
-    ->whereHas('category', function ($query) {
-        $query->where('status', 'Active');
-    })
-    ->latest()
-    ->get();
+    $categories = Category::where('status', 'Active')
+        ->with([
+            'subCategories' => function ($query) {
+                 $query->latest();
+            }
+        ])
+        ->latest()
+        ->get();
 
     return response()->json([
         'success' => true,
-        'message' => 'Active Category Sub Category List Successfully',
-        'data' => $subCategories,
+        'message' => 'Active Categories and Sub Categories Fetched Successfully',
+        'total_categories' => $categories->count(),
+        'data' => $categories,
     ], 200);
 }
 

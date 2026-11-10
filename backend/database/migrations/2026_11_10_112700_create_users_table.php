@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -6,24 +7,29 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+
             $table->string('name');
             $table->string('email')->unique();
             $table->string('phone')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            
-            // String column for roles (flexible for any custom roles like admin, user, vendor, etc.)
+
+            // User Branch
+            $table->foreignId('branch_id')
+                ->nullable()
+                ->constrained('branches')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+
+            // User Role
             $table->string('role')->default('user');
-            
-            // Status for active/inactive state
-            $table->boolean('status')->default(true); // true = active, false = inactive
+
+            // User Status
+            $table->boolean('status')->default(true);
 
             $table->rememberToken();
             $table->timestamps();
@@ -45,13 +51,10 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
     }
 };

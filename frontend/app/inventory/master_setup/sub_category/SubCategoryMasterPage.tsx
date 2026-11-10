@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, FormEvent, ReactNode } from "react";
+
 import {
   Plus,
   Search,
@@ -20,10 +22,15 @@ import axiosInstance from "@/app/api/axiosInstance";
 import ProjectApiList from "@/app/api/ProjectApiList";
 import { toast } from "sonner";
 
+/* =========================
+   TYPES
+========================= */
+
 interface Category {
   id: number;
   category_name: string;
   status: "Active" | "Inactive";
+  sub_categories?: SubCategory[];
 }
 
 interface SubCategory {
@@ -31,8 +38,7 @@ interface SubCategory {
   category_id: number;
   sub_category_name: string;
   status: "Active" | "Inactive";
-  category?: Category;
-  category_name?: string;
+  category?: Category | null;
 }
 
 interface SubCategoryFormData {
@@ -47,9 +53,14 @@ const emptyForm: SubCategoryFormData = {
   status: "Active",
 };
 
+/* =========================
+   MAIN COMPONENT
+========================= */
+
 export default function SubCategoryMasterPage() {
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+
   const [form, setForm] = useState<SubCategoryFormData>(emptyForm);
 
   const [loading, setLoading] = useState(false);
@@ -69,124 +80,133 @@ export default function SubCategoryMasterPage() {
   const [selectedSubCategory, setSelectedSubCategory] =
     useState<SubCategory | null>(null);
 
-  // Fetch only Active Categories
-  const fetchCategories = async () => {
+  /* =========================
+     FETCH SUB CATEGORIES
+     SINGLE API
+  ========================= */
+
+  const fetchSubCategories = useCallback(async () => {
     try {
+      setLoading(true);
+
+      // API response category-wise hai aur har category ke andar
+      // sub_categories array aa raha hai.
       const response = await axiosInstance.get(
         ProjectApiList.categoryList
       );
 
       const rows = response.data?.data;
 
-      const activeRows: Category[] = Array.isArray(rows)
-        ? rows.filter(
-            (category: Category) => category.status === "Active"
-          )
-        : [];
+      if (!Array.isArray(rows)) {
+        setCategories([]);
+        setSubCategories([]);
+        return;
+      }
 
-      setCategories(activeRows);
+      // Dropdown/filter ke liye active categories
+      const activeCategories: Category[] = rows.filter(
+        (category: Category) => category.status === "Active"
+      );
+
+      setCategories(activeCategories);
+
+      // Nested sub_categories ko table ke liye flat list me convert karo
+      const allSubCategories: SubCategory[] = activeCategories.flatMap(
+        (category) => {
+          const children = Array.isArray(category.sub_categories)
+            ? category.sub_categories
+            : [];
+
+          return children.map((subCategory) => ({
+            ...subCategory,
+            category_id: subCategory.category_id || category.id,
+            category: {
+              id: category.id,
+              category_name: category.category_name,
+              status: category.status,
+            },
+          }));
+        }
+      );
+
+      setSubCategories(allSubCategories);
+
+      console.log("Category API Response:", rows);
+      console.log("Sub Category Table Data:", allSubCategories);
     } catch (error: any) {
-      console.error("Category List Error:", error);
+      console.error("Sub Category Fetch Error:", error);
 
       toast.error(
         error.response?.data?.message ||
-          "Category list load nahi hui"
-      );
-    }
-  };
-
-  // Fetch Sub Categories
-  const fetchSubCategories = async () => {
-    try {
-      setLoading(true);
-
-      const response = await axiosInstance.get(
-        ProjectApiList.subCategoryList
-      );
-
-      const rows = response.data?.data;
-
-      setSubCategories(Array.isArray(rows) ? rows : []);
-    } catch (error: any) {
-      console.error("Sub Category List Error:", error);
-
-      toast.error(
-        error.response?.data?.message ||
-          "Sub category list load nahi hui"
+          "Sub Category list load nahi hui"
       );
     } finally {
       setLoading(false);
     }
-  };
-
-  // Refresh both APIs
-  const refreshAll = async () => {
-    await Promise.all([
-      fetchCategories(),
-      fetchSubCategories(),
-    ]);
-  };
-
-  useEffect(() => {
-    refreshAll();
   }, []);
 
-  // Get Category Name
-  const getCategoryName = (item: SubCategory) => {
-    return (
-      item.category?.category_name ||
-      item.category_name ||
-      categories.find(
-        (category) => category.id === item.category_id
-      )?.category_name ||
-      "Category not found"
-    );
+  /* =========================
+     INITIAL LOAD
+  ========================= */
+
+  useEffect(() => {
+    fetchSubCategories();
+  }, [fetchSubCategories]);
+
+  /* =========================
+     REFRESH
+  ========================= */
+
+  const refreshAll = async () => {
+    await fetchSubCategories();
   };
 
-  // Only show Sub Categories of Active Categories
+  /* =========================
+     GET CATEGORY NAME
+  ========================= */
+
+  const getCategoryName = (item: SubCategory): string => {
+    return item.category?.category_name || "Category not found";
+  };
+
+  /* =========================
+     SEARCH AND FILTER
+  ========================= */
+
   const filteredSubCategories = useMemo(() => {
-    const value = search.toLowerCase().trim();
+    const searchValue = search.toLowerCase().trim();
 
     return subCategories.filter((item) => {
-      const isParentCategoryActive = categories.some(
-        (category) => category.id === item.category_id
-      );
-
-      if (!isParentCategoryActive) {
-        return false;
-      }
+      const categoryName = getCategoryName(item);
 
       const matchesSearch = [
         item.sub_category_name,
-        getCategoryName(item),
+        categoryName,
         item.status,
       ].some((field) =>
-        String(field || "").toLowerCase().includes(value)
+        String(field || "").toLowerCase().includes(searchValue)
       );
 
       const matchesStatus =
-        statusFilter === "All" ||
-        item.status === statusFilter;
+        statusFilter === "All" || item.status === statusFilter;
 
       const matchesCategory =
         categoryFilter === "All" ||
         String(item.category_id) === categoryFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesCategory
-      );
+      return matchesSearch && matchesStatus && matchesCategory;
     });
   }, [
     subCategories,
-    categories,
     search,
     statusFilter,
     categoryFilter,
   ]);
 
-  // Pagination
+  /* =========================
+     PAGINATION
+  ========================= */
+
   const totalPages = Math.max(
     1,
     Math.ceil(filteredSubCategories.length / perPage)
@@ -201,7 +221,10 @@ export default function SubCategoryMasterPage() {
     setCurrentPage(1);
   }, [search, statusFilter, categoryFilter]);
 
-  // Correct Stats: count only visible Active-parent records
+  /* =========================
+     STATISTICS
+  ========================= */
+
   const totalSubCategories = filteredSubCategories.length;
 
   const activeSubCategories = filteredSubCategories.filter(
@@ -212,11 +235,14 @@ export default function SubCategoryMasterPage() {
     (item) => item.status === "Inactive"
   ).length;
 
-  // Add Modal
+  /* =========================
+     ADD MODAL
+  ========================= */
+
   const openAddModal = () => {
     if (categories.length === 0) {
       toast.error(
-        "Pehle Category Master mein Active category add karein"
+        "Category list me koi Active Category nahi mili"
       );
       return;
     }
@@ -226,30 +252,37 @@ export default function SubCategoryMasterPage() {
     setModalType("add");
   };
 
-  // Edit Modal
+  /* =========================
+     EDIT MODAL
+  ========================= */
+
   const openEditModal = (item: SubCategory) => {
     setSelectedSubCategory(item);
 
     setForm({
-      category_id: String(item.category_id || ""),
-      sub_category_name: item.sub_category_name || "",
-      status: item.status || "Active",
+      category_id: String(item.category_id),
+      sub_category_name: item.sub_category_name,
+      status: item.status,
     });
 
     setModalType("edit");
   };
 
-  // View Modal
+  /* =========================
+     VIEW MODAL
+  ========================= */
+
   const openViewModal = (item: SubCategory) => {
     setSelectedSubCategory(item);
     setModalType("view");
   };
 
-  // Input Change
+  /* =========================
+     FORM CHANGE
+  ========================= */
+
   const handleChange = (
-    event: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement
-    >
+    event: ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = event.target;
 
@@ -259,17 +292,21 @@ export default function SubCategoryMasterPage() {
     }));
   };
 
-  // Close Modal
+  /* =========================
+     CLOSE MODAL
+  ========================= */
+
   const closeModal = () => {
     setModalType(null);
     setSelectedSubCategory(null);
     setForm(emptyForm);
   };
 
-  // Add / Update Sub Category
-  const handleSubmit = async (
-    event: React.FormEvent<HTMLFormElement>
-  ) => {
+  /* =========================
+     ADD / UPDATE SUB CATEGORY
+  ========================= */
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!form.category_id) {
@@ -283,12 +320,11 @@ export default function SubCategoryMasterPage() {
     }
 
     const selectedCategory = categories.find(
-      (category) =>
-        category.id === Number(form.category_id)
+      (category) => category.id === Number(form.category_id)
     );
 
     if (!selectedCategory) {
-      toast.error("Sirf Active Category select karein");
+      toast.error("Valid Category select karein");
       return;
     }
 
@@ -303,28 +339,23 @@ export default function SubCategoryMasterPage() {
 
       if (modalType === "edit" && selectedSubCategory) {
         await axiosInstance.put(
-          ProjectApiList.subCategoryUpdate(
-            selectedSubCategory.id
-          ),
+          ProjectApiList.subCategoryUpdate(selectedSubCategory.id),
           payload
         );
 
-        toast.success(
-          "Sub category successfully updated"
-        );
+        toast.success("Sub Category successfully updated");
       } else {
         await axiosInstance.post(
           ProjectApiList.subCategoryCreate,
           payload
         );
 
-        toast.success(
-          "Sub category successfully added"
-        );
+        toast.success("Sub Category successfully added");
       }
 
       closeModal();
-      await refreshAll();
+
+      await fetchSubCategories();
     } catch (error: any) {
       console.error("Sub Category Save Error:", error);
 
@@ -349,7 +380,10 @@ export default function SubCategoryMasterPage() {
     }
   };
 
-  // Delete Sub Category
+  /* =========================
+     DELETE SUB CATEGORY
+  ========================= */
+
   const handleDelete = async () => {
     if (!selectedSubCategory) return;
 
@@ -357,32 +391,35 @@ export default function SubCategoryMasterPage() {
       setSaving(true);
 
       await axiosInstance.delete(
-        ProjectApiList.subCategoryDelete(
-          selectedSubCategory.id
-        )
+        ProjectApiList.subCategoryDelete(selectedSubCategory.id)
       );
 
-      toast.success(
-        "Sub category successfully deleted"
-      );
+      toast.success("Sub Category successfully deleted");
 
       closeModal();
-      await refreshAll();
+
+      await fetchSubCategories();
     } catch (error: any) {
       console.error("Sub Category Delete Error:", error);
 
       toast.error(
         error.response?.data?.message ||
-          "Sub category delete nahi hui"
+          "Sub Category delete nahi hui"
       );
     } finally {
       setSaving(false);
     }
   };
 
+  /* =========================
+     UI
+  ========================= */
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* Header */}
+
+      {/* HEADER */}
+
       <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
@@ -390,7 +427,7 @@ export default function SubCategoryMasterPage() {
           </h1>
 
           <p className="mt-1 text-sm text-gray-500">
-            Manage sub categories under Active categories only
+            Manage all sub categories
           </p>
         </div>
 
@@ -404,7 +441,8 @@ export default function SubCategoryMasterPage() {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* STAT CARDS */}
+
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
           title="Total Sub Categories"
@@ -428,9 +466,12 @@ export default function SubCategoryMasterPage() {
         />
       </div>
 
-      {/* Table Container */}
+      {/* TABLE CONTAINER */}
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        {/* Search and Filters */}
+
+        {/* SEARCH AND FILTER */}
+
         <div className="flex flex-col justify-between gap-3 border-b border-gray-200 p-4 md:flex-row md:items-center">
           <div>
             <h2 className="font-semibold text-gray-800">
@@ -443,6 +484,9 @@ export default function SubCategoryMasterPage() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+
+            {/* SEARCH */}
+
             <div className="relative">
               <Search
                 size={17}
@@ -453,14 +497,13 @@ export default function SubCategoryMasterPage() {
                 type="text"
                 placeholder="Search sub category..."
                 value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
+                onChange={(event) => setSearch(event.target.value)}
                 className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-blue-500 sm:w-56"
               />
             </div>
 
-            {/* Category Filter */}
+            {/* CATEGORY FILTER */}
+
             <select
               value={categoryFilter}
               onChange={(event) =>
@@ -480,7 +523,8 @@ export default function SubCategoryMasterPage() {
               ))}
             </select>
 
-            {/* Status Filter */}
+            {/* STATUS FILTER */}
+
             <select
               value={statusFilter}
               onChange={(event) =>
@@ -493,7 +537,8 @@ export default function SubCategoryMasterPage() {
               <option value="Inactive">Inactive</option>
             </select>
 
-            {/* Refresh */}
+            {/* REFRESH */}
+
             <button
               type="button"
               onClick={refreshAll}
@@ -509,26 +554,23 @@ export default function SubCategoryMasterPage() {
           </div>
         </div>
 
-        {/* Table */}
+        {/* TABLE */}
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left text-sm">
+
             <thead className="bg-gray-100 text-xs uppercase text-gray-600">
               <tr>
                 <th className="px-5 py-4">#</th>
-                <th className="px-5 py-4">
-                  Sub Category Name
-                </th>
-                <th className="px-5 py-4">
-                  Category Name
-                </th>
+                <th className="px-5 py-4">Sub Category Name</th>
+                <th className="px-5 py-4">Category Name</th>
                 <th className="px-5 py-4">Status</th>
-                <th className="px-5 py-4 text-center">
-                  Actions
-                </th>
+                <th className="px-5 py-4 text-center">Actions</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-gray-100">
+
               {loading ? (
                 <tr>
                   <td
@@ -548,6 +590,7 @@ export default function SubCategoryMasterPage() {
                       size={35}
                       className="mx-auto mb-2 text-gray-300"
                     />
+
                     No sub categories found
                   </td>
                 </tr>
@@ -558,9 +601,7 @@ export default function SubCategoryMasterPage() {
                     className="hover:bg-gray-50"
                   >
                     <td className="px-5 py-4 text-gray-500">
-                      {(currentPage - 1) * perPage +
-                        index +
-                        1}
+                      {(currentPage - 1) * perPage + index + 1}
                     </td>
 
                     <td className="px-5 py-4 font-medium text-gray-800">
@@ -577,6 +618,7 @@ export default function SubCategoryMasterPage() {
 
                     <td className="px-5 py-4">
                       <div className="flex justify-center gap-2">
+
                         <ActionButton
                           title="View"
                           onClick={() => openViewModal(item)}
@@ -603,17 +645,21 @@ export default function SubCategoryMasterPage() {
                         >
                           <Trash2 size={16} />
                         </ActionButton>
+
                       </div>
                     </td>
                   </tr>
                 ))
               )}
+
             </tbody>
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* PAGINATION */}
+
         <div className="flex flex-col items-center justify-between gap-3 border-t border-gray-200 px-5 py-4 sm:flex-row">
+
           <p className="text-xs text-gray-500">
             Showing{" "}
             {filteredSubCategories.length === 0
@@ -628,6 +674,7 @@ export default function SubCategoryMasterPage() {
           </p>
 
           <div className="flex items-center gap-2">
+
             <button
               type="button"
               disabled={currentPage === 1}
@@ -657,11 +704,13 @@ export default function SubCategoryMasterPage() {
             >
               <ChevronRight size={17} />
             </button>
+
           </div>
         </div>
       </div>
 
-      {/* Add / Edit Modal */}
+      {/* ADD / EDIT MODAL */}
+
       {(modalType === "add" || modalType === "edit") && (
         <Modal
           title={
@@ -675,7 +724,9 @@ export default function SubCategoryMasterPage() {
             onSubmit={handleSubmit}
             className="space-y-5"
           >
-            {/* Category */}
+
+            {/* CATEGORY */}
+
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Category <span className="text-red-500">*</span>
@@ -701,7 +752,8 @@ export default function SubCategoryMasterPage() {
               </select>
             </div>
 
-            {/* Sub Category Name */}
+            {/* SUB CATEGORY NAME */}
+
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Sub Category Name{" "}
@@ -720,7 +772,8 @@ export default function SubCategoryMasterPage() {
               />
             </div>
 
-            {/* Status */}
+            {/* STATUS */}
+
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Status
@@ -737,11 +790,14 @@ export default function SubCategoryMasterPage() {
               </select>
             </div>
 
-            {/* Buttons */}
+            {/* BUTTONS */}
+
             <div className="flex justify-end gap-3 border-t border-gray-100 pt-4">
+
               <button
                 type="button"
                 onClick={closeModal}
+                disabled={saving}
                 className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
               >
                 Cancel
@@ -758,18 +814,21 @@ export default function SubCategoryMasterPage() {
                     ? "Save Sub Category"
                     : "Update Sub Category"}
               </button>
+
             </div>
           </form>
         </Modal>
       )}
 
-      {/* View Modal */}
+      {/* VIEW MODAL */}
+
       {modalType === "view" && selectedSubCategory && (
         <Modal
           title="Sub Category Details"
           onClose={closeModal}
         >
           <div className="space-y-4">
+
             <Detail
               label="Sub Category ID"
               value={selectedSubCategory.id}
@@ -802,17 +861,20 @@ export default function SubCategoryMasterPage() {
             >
               Close
             </button>
+
           </div>
         </Modal>
       )}
 
-      {/* Delete Modal */}
+      {/* DELETE MODAL */}
+
       {modalType === "delete" && selectedSubCategory && (
         <Modal
           title="Delete Sub Category"
           onClose={closeModal}
         >
           <div className="text-center">
+
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 text-red-600">
               <Trash2 size={28} />
             </div>
@@ -830,6 +892,7 @@ export default function SubCategoryMasterPage() {
             </p>
 
             <div className="mt-6 flex justify-center gap-3">
+
               <button
                 type="button"
                 onClick={closeModal}
@@ -847,15 +910,20 @@ export default function SubCategoryMasterPage() {
               >
                 {saving ? "Deleting..." : "Yes, Delete"}
               </button>
+
             </div>
           </div>
         </Modal>
       )}
+
     </div>
   );
 }
 
-// Stats Card
+/* =========================
+   STAT CARD
+========================= */
+
 function StatCard({
   title,
   value,
@@ -864,7 +932,7 @@ function StatCard({
 }: {
   title: string;
   value: number;
-  icon: React.ReactNode;
+  icon: ReactNode;
   color: "blue" | "green" | "red";
 }) {
   const colors = {
@@ -876,8 +944,11 @@ function StatCard({
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
+
         <div>
-          <p className="text-sm text-gray-500">{title}</p>
+          <p className="text-sm text-gray-500">
+            {title}
+          </p>
 
           <h3 className="mt-2 text-2xl font-bold text-gray-800">
             {value}
@@ -889,12 +960,16 @@ function StatCard({
         >
           {icon}
         </div>
+
       </div>
     </div>
   );
 }
 
-// Status Badge
+/* =========================
+   STATUS BADGE
+========================= */
+
 function StatusBadge({
   status,
 }: {
@@ -913,14 +988,17 @@ function StatusBadge({
   );
 }
 
-// Action Button
+/* =========================
+   ACTION BUTTON
+========================= */
+
 function ActionButton({
   children,
   title,
   onClick,
   color,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   title: string;
   onClick: () => void;
   color: "blue" | "green" | "red";
@@ -943,19 +1021,23 @@ function ActionButton({
   );
 }
 
-// Modal
+/* =========================
+   MODAL
+========================= */
+
 function Modal({
   title,
   children,
   onClose,
 }: {
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
   onClose: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-xl">
+
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <h2 className="text-lg font-semibold text-gray-800">
             {title}
@@ -971,13 +1053,19 @@ function Modal({
           </button>
         </div>
 
-        <div className="p-5">{children}</div>
+        <div className="p-5">
+          {children}
+        </div>
+
       </div>
     </div>
   );
 }
 
-// Detail Row
+/* =========================
+   DETAIL ROW
+========================= */
+
 function Detail({
   label,
   value,
@@ -987,6 +1075,7 @@ function Detail({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-gray-100 py-3">
+
       <span className="text-sm text-gray-500">
         {label}
       </span>
@@ -994,6 +1083,7 @@ function Detail({
       <span className="text-sm font-semibold text-gray-800">
         {value}
       </span>
+
     </div>
   );
 }

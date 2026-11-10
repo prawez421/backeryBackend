@@ -36,21 +36,30 @@ interface VendorTableProps {
 }
 
 export default function VendorTable({
-  vendors,
-  totalVendors,
-  activeVendors,
-  inactiveVendors,
-  openingBalanceTotal,
-  currentPage,
-  totalPages,
-  totalItems,
-  itemsPerPage,
+  vendors = [],
+  totalVendors = 0,
+  activeVendors = 0,
+  inactiveVendors = 0,
+  openingBalanceTotal = 0,
+  currentPage = 1,
+  totalPages = 1,
+  totalItems = 0,
+  itemsPerPage = 10,
   onPageChange,
   onItemsPerPageChange,
   onView,
   onEdit,
   onDelete,
 }: VendorTableProps) {
+
+  const safeVendors = Array.isArray(vendors) ? vendors : [];
+
+  const formatAmount = (amount: unknown) => {
+    return Number(amount || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
 
   const stats = [
     {
@@ -73,7 +82,7 @@ export default function VendorTable({
     },
     {
       title: "Opening Balance",
-      value: `₹${openingBalanceTotal.toLocaleString("en-IN")}`,
+      value: `₹${formatAmount(openingBalanceTotal)}`,
       icon: Wallet,
       color: "bg-orange-50 text-orange-600",
     },
@@ -92,7 +101,7 @@ export default function VendorTable({
   return (
     <div className="space-y-6">
 
-      {/* Statistics Cards */}
+      {/* Statistics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 
         {stats.map((stat) => {
@@ -129,7 +138,6 @@ export default function VendorTable({
       {/* Vendor Table */}
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
 
-        {/* Table Header */}
         <div className="flex flex-col justify-between gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center">
 
           <div>
@@ -148,7 +156,6 @@ export default function VendorTable({
 
         </div>
 
-        {/* Table Content */}
         <div className="overflow-x-auto">
 
           <table className="w-full min-w-[1050px] text-left">
@@ -176,131 +183,129 @@ export default function VendorTable({
 
             <tbody className="divide-y divide-gray-100">
 
-              {vendors.length > 0 ? (
+              {safeVendors.length > 0 ? (
 
-                vendors.map((vendor) => (
+                safeVendors.map((vendor) => {
 
-                  <tr
-                    key={vendor.id}
-                    className="transition hover:bg-orange-50/40"
-                  >
+                  const isActive =
+                    String(vendor.status).toLowerCase() === "active";
 
-                    {/* Vendor Details */}
-                    <td className="px-5 py-4">
+                  return (
+                    <tr
+                      key={vendor.id}
+                      className="transition hover:bg-orange-50/40"
+                    >
 
-                      <p className="font-semibold text-gray-800">
-                        {vendor.vendor_name}
-                      </p>
+                      {/* Vendor Details */}
+                      <td className="px-5 py-4">
 
-                      <p className="mt-1 text-xs text-orange-600">
-                        {vendor.vendor_code}
-                      </p>
+                        <p className="font-semibold text-gray-800">
+                          {vendor.vendor_name || "-"}
+                        </p>
 
-                      <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                        <Building2 size={13} />
-                        {vendor.company_name || "-"}
-                      </p>
+                        <p className="mt-1 text-xs text-orange-600">
+                          {vendor.vendor_code || "-"}
+                        </p>
 
-                    </td>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                          <Building2 size={13} />
+                          {vendor.company_name || "-"}
+                        </p>
 
-                    {/* Contact Details */}
-                    <td className="px-5 py-4">
+                      </td>
 
-                      <p className="flex items-center gap-2 text-sm text-gray-700">
-                        <Phone size={14} className="text-gray-400" />
-                        {vendor.mobile || "-"}
-                      </p>
+                      {/* Contact */}
+                      <td className="px-5 py-4">
 
-                      <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                        <Mail size={14} className="text-gray-400" />
-                        {vendor.email || "-"}
-                      </p>
+                        <p className="flex items-center gap-2 text-sm text-gray-700">
+                          <Phone size={14} className="text-gray-400" />
+                          {vendor.mobile || "-"}
+                        </p>
 
-                      <p className="mt-1 text-xs text-gray-400">
-                        {vendor.contact_person || "-"}
-                      </p>
+                        <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                          <Mail size={14} className="text-gray-400" />
+                          {vendor.email || "-"}
+                        </p>
 
-                    </td>
+                        <p className="mt-1 text-xs text-gray-400">
+                          {vendor.contact_person || "-"}
+                        </p>
 
-                    {/* Category */}
-                    <td className="px-5 py-4">
+                      </td>
 
-                      <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600">
-                        {vendor.category || "-"}
-                      </span>
+                      {/* Category */}
+                      <td className="px-5 py-4">
+                        <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600">
+                          {vendor.category || "-"}
+                        </span>
+                      </td>
 
-                    </td>
+                      {/* GST */}
+                      <td className="px-5 py-4 text-sm text-gray-600">
+                        {vendor.gst_number || "-"}
+                      </td>
 
-                    {/* GST */}
-                    <td className="px-5 py-4 text-sm text-gray-600">
-                      {vendor.gst_number || "-"}
-                    </td>
+                      {/* Opening Balance */}
+                      <td className="px-5 py-4">
+                        <span className="font-semibold text-gray-800">
+                          ₹{formatAmount(vendor.opening_balance)}
+                        </span>
+                      </td>
 
-                    {/* Opening Balance */}
-                    <td className="px-5 py-4">
+                      {/* Status */}
+                      <td className="px-5 py-4">
 
-                      <span className="font-semibold text-gray-800">
-                        ₹{Number(
-                          vendor.opening_balance || 0
-                        ).toLocaleString("en-IN")}
-                      </span>
-
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-5 py-4">
-
-                      <span
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                          vendor.status === "Active"
-                            ? "bg-green-50 text-green-600"
-                            : "bg-red-50 text-red-600"
-                        }`}
-                      >
-                        {vendor.status}
-                      </span>
-
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-5 py-4">
-
-                      <div className="flex items-center gap-2">
-
-                        <button
-                          type="button"
-                          title="View Vendor"
-                          onClick={() => onView(vendor)}
-                          className="rounded-lg bg-blue-50 p-2 text-blue-600 transition hover:bg-blue-100"
+                        <span
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                            isActive
+                              ? "bg-green-50 text-green-600"
+                              : "bg-red-50 text-red-600"
+                          }`}
                         >
-                          <Eye size={17} />
-                        </button>
+                          {vendor.status || "Inactive"}
+                        </span>
 
-                        <button
-                          type="button"
-                          title="Edit Vendor"
-                          onClick={() => onEdit(vendor)}
-                          className="rounded-lg bg-orange-50 p-2 text-orange-600 transition hover:bg-orange-100"
-                        >
-                          <Pencil size={17} />
-                        </button>
+                      </td>
 
-                        <button
-                          type="button"
-                          title="Delete Vendor"
-                          onClick={() => onDelete(vendor)}
-                          className="rounded-lg bg-red-50 p-2 text-red-600 transition hover:bg-red-100"
-                        >
-                          <Trash2 size={17} />
-                        </button>
+                      {/* Actions */}
+                      <td className="px-5 py-4">
 
-                      </div>
+                        <div className="flex items-center gap-2">
 
-                    </td>
+                          <button
+                            type="button"
+                            title="View Vendor"
+                            onClick={() => onView(vendor)}
+                            className="rounded-lg bg-blue-50 p-2 text-blue-600 hover:bg-blue-100"
+                          >
+                            <Eye size={17} />
+                          </button>
 
-                  </tr>
+                          <button
+                            type="button"
+                            title="Edit Vendor"
+                            onClick={() => onEdit(vendor)}
+                            className="rounded-lg bg-orange-50 p-2 text-orange-600 hover:bg-orange-100"
+                          >
+                            <Pencil size={17} />
+                          </button>
 
-                ))
+                          <button
+                            type="button"
+                            title="Delete Vendor"
+                            onClick={() => onDelete(vendor)}
+                            className="rounded-lg bg-red-50 p-2 text-red-600 hover:bg-red-100"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+
+                        </div>
+
+                      </td>
+
+                    </tr>
+                  );
+                })
 
               ) : (
 
@@ -317,7 +322,7 @@ export default function VendorTable({
                     </p>
 
                     <p className="mt-1 text-sm text-gray-400">
-                      Add a new vendor to get started.
+                      No vendor records available.
                     </p>
 
                   </td>
@@ -360,7 +365,7 @@ export default function VendorTable({
                 type="button"
                 disabled={currentPage <= 1}
                 onClick={() => onPageChange(currentPage - 1)}
-                className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:opacity-40"
               >
                 <ChevronLeft size={18} />
               </button>
@@ -373,7 +378,7 @@ export default function VendorTable({
                 type="button"
                 disabled={currentPage >= totalPages || totalPages === 0}
                 onClick={() => onPageChange(currentPage + 1)}
-                className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg border border-gray-200 p-2 hover:bg-gray-50 disabled:opacity-40"
               >
                 <ChevronRight size={18} />
               </button>

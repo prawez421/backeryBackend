@@ -4,82 +4,170 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\Branch;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    // registration 
+    // Registration
     public function register(Request $request)
     {
-        // request data validate karnein
         $validated = $request->validate([
-          'name'     => ['required', 'string', 'max:255'],
-          'email'    => ['required', 'string', 'email' , 'max:255', 'unique:users'],
-          'phone'    => ['required', 'string', 'unique:users'],
-          'password' => ['required', 'string', 'min:8'],  //  'password' => ['required', 'string', 'min:8', 'confirmed'],
-          'role'     => ['required', 'string', 'in:admin,user,manager,vender'],  
+            'name' => [
+                'required',
+                'string',
+                'max:255'
+            ],
+
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                'unique:users,email'
+            ],
+
+            'phone' => [
+                'required',
+                'string',
+                'unique:users,phone'
+            ],
+
+            'password' => [
+                'required',
+                'string',
+                'min:6'
+            ],
+
+            // Branch code users.branch_id mein save hoga
+            'branch_id' => [
+                'required',
+                'string',
+                'exists:branches,branch_code'
+            ],
         ]);
 
-        // User create karein (Password automatic cast ya Hash ho jayega agar model mein hashed cast hai, warna Hash::make() use karein)
+        // Branch code se active branch find karo
+        $branch = Branch::where(
+            'branch_code',
+            $validated['branch_id']
+        )
+        ->where('status', 'Active')
+        ->first();
 
-        $user = user::create([
-         'name'     => $validated['name'],
-         'email'    => $validated['email'],
-         'phone'    => $validated['phone'],
-         'password' => $validated['password'],  // Model mein 'password' => 'hashed' cast hone ki wajah se yeh automatically hash ho jayega
-         'role'     => $validated['role'] ?? 'user',
-         'status'   => true,
+        if (!$branch) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selected branch is inactive or unavailable.',
+            ], 422);
+        }
+
+        // Create User
+        $user = User::create([
+            'name'       => $validated['name'],
+            'email'      => $validated['email'],
+            'phone'      => $validated['phone'],
+            'password'   => $validated['password'],
+            'role'       => 'user',
+            'status'     => true,
+
+            // Branch code branch_id column mein save hoga
+            'branch_id'  => $branch->branch_code,
         ]);
 
-        // Registration ke baad turant token generate karein taaki user auto-login ho jaye
+        // Generate Token
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
+            'success'      => true,
             'message'      => 'User registered successfully',
             'access_token' => $token,
             'token_type'   => 'Bearer',
-            'user'         => $user
+            'user'         => $user->load('branch'),
         ], 201);
     }
 
-    // login 
 
+    // Login
     public function login(Request $request)
     {
-        // login 
         $request->validate([
-           'email'    => 'required|email',
-           'password' => 'required',
+            'email' => [
+                'required',
+                'email'
+            ],
+
+            'password' => [
+                'required'
+            ],
         ]);
 
-        $user = user::where('email', $request->email)->first();
-        //check karein ki user exist karta hai aur password match hota hai 
-        if(! $user || ! Hash::check($request->password, $user->password)){
-            throw validationException::withMessages([
-             'email' => ['The provided credentials are incorrect.'],
+        $user = User::with('branch')
+            ->where('email', $request->email)
+            ->first();
+
+        // Check credentials
+        if (
+            !$user ||
+            !Hash::check($request->password, $user->password)
+        ) {
+            throw ValidationException::withMessages([
+                'email' => [
+                    'The provided credentials are incorrect.'
+                ],
             ]);
         }
 
-        // Token create karein
+        // Check User Status
+        if (!$user->status) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your account is inactive.',
+            ], 403);
+        }
+
+        // Generate Token
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'message' => 'Login successgul',
+            'success'      => true,
+            'message'      => 'Login successful',
             'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user'  => $user
+            'token_type'   => 'Bearer',
+            'user'         => $user,
         ], 200);
     }
 
-    // user logout
+
+    // Logout
     public function logout(Request $request)
     {
-        // Current access token ko delete/revoke kar dein
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([
-            'message' => 'Logged out successfully'
-        ] , 200);
+            'success' => true,
+            'message' => 'Logged out successfully',
+        ], 200);
+    }
+
+
+    // Get Active Branches
+    public function getBranches()
+    {
+        $branches = Branch::where('status', 'Active')
+            ->select(
+                'id',
+                'branch_name',
+                'branch_code'
+            )
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Branches fetched successfully',
+            'data' => $branches,
+        ], 200);
     }
 }

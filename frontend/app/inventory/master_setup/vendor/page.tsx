@@ -18,11 +18,11 @@ import VendorModal, {
 
 type ModalMode = "add" | "edit" | "view" | "delete" | null;
 
-// Laravel API Response
 interface VendorApiResponse {
   success: boolean;
   message: string;
-  data: Vendor[];
+
+  vendors: Vendor[];
 
   statistics: {
     total_vendors: number;
@@ -33,9 +33,9 @@ interface VendorApiResponse {
 
   pagination: {
     current_page: number;
-    last_page: number;
     per_page: number;
-    total: number;
+    total_items: number;
+    total_pages: number;
   };
 }
 
@@ -47,36 +47,28 @@ const defaultStatistics = {
 };
 
 export default function VendorPage() {
-  // =====================================
-  // VENDOR DATA
-  // =====================================
-
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Search
   const [search, setSearch] = useState("");
 
-  // Modal
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedVendor, setSelectedVendor] =
     useState<Vendor | null>(null);
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Backend Statistics
   const [statistics, setStatistics] = useState(defaultStatistics);
 
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
   // =====================================
-  // API ERROR HANDLING
+  // API ERROR
   // =====================================
 
-  const handleApiError = (error: unknown, defaultMessage: string) => {
+  const handleApiError = (error: unknown, message: string) => {
     console.error("Vendor API Error:", error);
 
     if (axios.isAxiosError(error)) {
@@ -87,7 +79,7 @@ export default function VendorPage() {
           responseData.errors as Record<string, string[]>
         ).flat();
 
-        toast.error(errors[0] || defaultMessage);
+        toast.error(errors[0] || message);
         return;
       }
 
@@ -97,41 +89,88 @@ export default function VendorPage() {
       }
     }
 
-    toast.error(defaultMessage);
+    toast.error(message);
   };
 
   // =====================================
-  // GET VENDOR LIST
+  // FETCH VENDORS AND STATISTICS
   // =====================================
 
   const fetchVendors = useCallback(async () => {
     try {
       setLoading(true);
 
-      const response = await axiosInstance.get<VendorApiResponse>(
+      const response = await axiosInstance.get(
         ProjectApiList.vendorList,
         {
           params: {
-            search,
+            search: search.trim(),
             page: currentPage,
             per_page: itemsPerPage,
           },
         }
       );
 
-      setVendors(response.data.data || []);
+      const result = response.data;
 
-      setStatistics(
-        response.data.statistics || defaultStatistics
+      console.log("Vendor API Response:", result);
+
+      if (!result.success) {
+        throw new Error(result.message || "Vendor data failed.");
+      }
+
+      // Vendor records
+      const vendorData = result.vendors ?? result.data ?? [];
+
+      setVendors(Array.isArray(vendorData) ? vendorData : []);
+
+      // Backend statistics
+      setStatistics({
+        total_vendors: Number(
+          result.statistics?.total_vendors ?? 0
+        ),
+        active_vendors: Number(
+          result.statistics?.active_vendors ?? 0
+        ),
+        inactive_vendors: Number(
+          result.statistics?.inactive_vendors ?? 0
+        ),
+        opening_balance_total: Number(
+          result.statistics?.opening_balance_total ?? 0
+        ),
+      });
+
+      // Backend pagination
+      const pagination = result.pagination ?? {};
+
+      setCurrentPage(
+        Number(
+          pagination.current_page ??
+          pagination.current_page_number ??
+          currentPage
+        )
       );
 
-      setTotalPages(
-        response.data.pagination?.last_page || 1
+      setItemsPerPage(
+        Number(pagination.per_page ?? itemsPerPage)
       );
 
       setTotalItems(
-        response.data.pagination?.total || 0
+        Number(
+          pagination.total_items ??
+          pagination.total ??
+          0
+        )
       );
+
+      setTotalPages(
+        Number(
+          pagination.total_pages ??
+          pagination.last_page ??
+          1
+        )
+      );
+
     } catch (error) {
       handleApiError(error, "Vendor list load nahi hui.");
     } finally {
@@ -139,13 +178,12 @@ export default function VendorPage() {
     }
   }, [search, currentPage, itemsPerPage]);
 
-  // Load API Data
   useEffect(() => {
     fetchVendors();
   }, [fetchVendors]);
 
   // =====================================
-  // OPEN MODAL
+  // MODAL
   // =====================================
 
   const openModal = (
@@ -156,17 +194,13 @@ export default function VendorPage() {
     setModalMode(mode);
   };
 
-  // =====================================
-  // CLOSE MODAL
-  // =====================================
-
   const closeModal = () => {
     setModalMode(null);
     setSelectedVendor(null);
   };
 
   // =====================================
-  // ADD / UPDATE VENDOR
+  // ADD / UPDATE
   // =====================================
 
   const handleSubmit = async (data: VendorFormData) => {
@@ -174,7 +208,6 @@ export default function VendorPage() {
       setLoading(true);
 
       if (modalMode === "edit" && selectedVendor) {
-        // UPDATE API
         const response = await axiosInstance.put(
           ProjectApiList.vendorUpdate(selectedVendor.id),
           data
@@ -184,11 +217,7 @@ export default function VendorPage() {
           response.data.message || "Vendor updated successfully!"
         );
 
-        closeModal();
-        await fetchVendors();
-
       } else {
-        // CREATE API
         const response = await axiosInstance.post(
           ProjectApiList.vendorCreate,
           data
@@ -197,15 +226,16 @@ export default function VendorPage() {
         toast.success(
           response.data.message || "Vendor added successfully!"
         );
-
-        closeModal();
-
-        if (currentPage !== 1) {
-          setCurrentPage(1);
-        } else {
-          await fetchVendors();
-        }
       }
+
+      closeModal();
+      setCurrentPage(1);
+
+      // Refresh backend records and statistics
+      if (currentPage === 1) {
+        await fetchVendors();
+      }
+
     } catch (error) {
       handleApiError(error, "Vendor save nahi hua.");
     } finally {
@@ -214,7 +244,7 @@ export default function VendorPage() {
   };
 
   // =====================================
-  // DELETE VENDOR
+  // DELETE
   // =====================================
 
   const handleDelete = async (vendor: Vendor) => {
@@ -236,6 +266,7 @@ export default function VendorPage() {
       } else {
         await fetchVendors();
       }
+
     } catch (error) {
       handleApiError(error, "Vendor delete nahi hua.");
     } finally {
@@ -245,11 +276,10 @@ export default function VendorPage() {
 
   // =====================================
   // EXPORT CSV
-  // Exports currently loaded page
   // =====================================
 
   const handleExport = () => {
-    if (vendors.length === 0) {
+    if (!vendors.length) {
       toast.error("No vendors available to export!");
       return;
     }
@@ -297,9 +327,7 @@ export default function VendorPage() {
 
     const csvContent = [
       headers.map(escapeCSV).join(","),
-      ...rows.map((row) =>
-        row.map(escapeCSV).join(",")
-      ),
+      ...rows.map((row) => row.map(escapeCSV).join(",")),
     ].join("\n");
 
     const blob = new Blob(
@@ -331,7 +359,6 @@ export default function VendorPage() {
 
       <div className="mx-auto max-w-[1600px] space-y-6">
 
-        {/* VENDOR HEADER */}
         <VendorHeader
           search={search}
           setSearch={(value) => {
@@ -342,14 +369,12 @@ export default function VendorPage() {
           onExport={handleExport}
         />
 
-        {/* LOADING */}
         {loading && (
           <div className="rounded-xl bg-orange-50 p-3 text-center text-sm text-orange-700">
-            Please wait, loading vendor data...
+            Loading vendor data...
           </div>
         )}
 
-        {/* VENDOR TABLE */}
         <VendorTable
           vendors={vendors}
           totalVendors={statistics.total_vendors}
@@ -370,7 +395,6 @@ export default function VendorPage() {
           onDelete={(vendor) => openModal("delete", vendor)}
         />
 
-        {/* VENDOR MODAL */}
         <VendorModal
           mode={modalMode}
           vendor={selectedVendor}

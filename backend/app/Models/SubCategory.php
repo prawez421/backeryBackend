@@ -15,7 +15,6 @@ class SubCategory extends Model
         'status',
     ];
 
-    // Main Category Relation
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class, 'category_id');

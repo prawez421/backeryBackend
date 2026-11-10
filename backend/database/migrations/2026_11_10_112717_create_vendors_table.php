@@ -1,3 +1,4 @@
+
 <?php
 
 use Illuminate\Database\Migrations\Migration;
@@ -11,7 +12,18 @@ return new class extends Migration
         Schema::create('vendors', function (Blueprint $table) {
             $table->id();
 
+            // Unique Vendor ID
+            $table->string('unique_id', 50)->unique();
+
+            // Vendor Code
             $table->string('vendor_code', 50)->unique();
+
+            // Branch Relationship
+            $table->foreignId('branch_id')
+                ->constrained('branches')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+
             $table->string('vendor_name', 150);
             $table->string('company_name', 150)->nullable();
 

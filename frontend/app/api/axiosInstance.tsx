@@ -1,3 +1,4 @@
+
 import axios from "axios";
 import BASE_URL from "./BaseUrls";
 
@@ -10,26 +11,17 @@ const axiosInstance = axios.create({
     Accept: "application/json",
     "Content-Type": "application/json",
   },
-
-  // Bearer token authentication ke liye
   withCredentials: false,
 });
 
-// Token save
+// Save Token
 export const saveToken = (token: string) => {
   if (typeof window !== "undefined") {
     localStorage.setItem(TOKEN_KEY, token);
   }
 };
 
-// User save
-export const saveUser = (user: unknown) => {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-  }
-};
-
-// Token get
+// Get Token
 export const getToken = () => {
   if (typeof window !== "undefined") {
     return localStorage.getItem(TOKEN_KEY);
@@ -38,18 +30,29 @@ export const getToken = () => {
   return null;
 };
 
-// User get
+// Save User
+export const saveUser = (user: unknown) => {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+};
+
+// Get User
 export const getUser = () => {
   if (typeof window !== "undefined") {
-    const user = localStorage.getItem(USER_KEY);
-
-    return user ? JSON.parse(user) : null;
+    try {
+      const user = localStorage.getItem(USER_KEY);
+      return user ? JSON.parse(user) : null;
+    } catch {
+      localStorage.removeItem(USER_KEY);
+      return null;
+    }
   }
 
   return null;
 };
 
-// Token aur user remove
+// Remove Authentication
 export const removeAuth = () => {
   if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);
@@ -57,7 +60,7 @@ export const removeAuth = () => {
   }
 };
 
-// Har API request mein token attach
+// Request Interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = getToken();
@@ -69,6 +72,25 @@ axiosInstance.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Response Interceptor
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      error.response?.status === 401 &&
+      typeof window !== "undefined"
+    ) {
+      removeAuth();
+
+      if (window.location.pathname !== "/login") {
+        window.location.replace("/auth/login");
+      }
+    }
+
+    return Promise.reject(error);
+  }
 );
 
 export default axiosInstance;

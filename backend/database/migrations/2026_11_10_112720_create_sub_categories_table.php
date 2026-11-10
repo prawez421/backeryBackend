@@ -14,6 +14,15 @@ return new class extends Migration
     {
         Schema::create('sub_categories', function (Blueprint $table) {
             $table->id();
+             // Unique Vendor ID
+            $table->string('unique_id', 50)->unique();
+
+            
+            // Branch Relationship
+            $table->foreignId('branch_id')
+                ->constrained('branches')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
 
             // Main Category Relation
             $table->foreignId('category_id')

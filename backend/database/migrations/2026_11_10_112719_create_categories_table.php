@@ -10,6 +10,16 @@ return new class extends Migration
     {
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
+             // Unique Vendor ID
+            $table->string('unique_id', 50)->unique();
+
+            
+            // Branch Relationship
+            $table->foreignId('branch_id')
+                ->constrained('branches')
+                ->cascadeOnUpdate()
+                ->restrictOnDelete();
+                
             $table->string('category_name', 100)->unique();
             $table->enum('status', ['Active', 'Inactive'])->default('Active');
             $table->timestamps();
