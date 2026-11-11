@@ -47,6 +47,7 @@ const masterItems = [
 { label: "Unit Master", href: "/inventory/master_setup/units", icon: Ruler },
 { label: "Category Master", href: "/inventory/master_setup/category", icon: Tags },
 { label: "Sub Category Master", href: "/inventory/master_setup/sub_category", icon: Tags },
+{ label: "Brands Master", href: "/inventory/master_setup/brands", icon: Tags },
   { label: "Attribute Master", href: "/inventory/master_setup/attributes", icon: Settings2 },
   { label: "Product Master", href: "/inventory/master_setup/products", icon: Package },
   { label: "Raw Material Master", href: "/inventory/master_setup/raw-materials", icon: Layers },

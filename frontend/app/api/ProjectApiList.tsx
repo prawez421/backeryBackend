@@ -31,6 +31,12 @@ const ProjectApiList = {
   subCategoryUpdate: (id: number) => `/sub-categories/${id}`,
   subCategoryDelete: (id: number) => `/sub-categories/${id}`,
 
+  // brands
+  brandList:"/brands",
+  brandCreate:"/brands",
+  brandUpdate:(id: number) => `/brands/${id}`,
+  brandDelete:(id: number) => `/brands/${id}`,
+
   // ATTRIBUTE MASTER
   attributeList: "/attributes",
   attributeCreate: "/attributes",

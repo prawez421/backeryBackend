@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Branch;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -40,18 +41,25 @@ class AuthController extends Controller
                 'min:6'
             ],
 
-            // Branch code users.branch_id mein save hoga
-            'branch_id' => [
+            // Role validation
+            'role' => [
+                'required',
+                'string',
+                Rule::in(['user', 'manager','admin'])
+            ],
+
+            // Branch code validation
+            'branch_code' => [
                 'required',
                 'string',
                 'exists:branches,branch_code'
             ],
         ]);
 
-        // Branch code se active branch find karo
+        // Find active branch
         $branch = Branch::where(
             'branch_code',
-            $validated['branch_id']
+            $validated['branch_code']
         )
         ->where('status', 'Active')
         ->first();
@@ -65,15 +73,13 @@ class AuthController extends Controller
 
         // Create User
         $user = User::create([
-            'name'       => $validated['name'],
-            'email'      => $validated['email'],
-            'phone'      => $validated['phone'],
-            'password'   => $validated['password'],
-            'role'       => 'user',
-            'status'     => true,
-
-            // Branch code branch_id column mein save hoga
-            'branch_id'  => $branch->branch_code,
+            'name'        => $validated['name'],
+            'email'       => $validated['email'],
+            'phone'       => $validated['phone'],
+            'password'    => $validated['password'],
+            'role'        => $validated['role'],
+            'status'      => true,
+            'branch_code' => $branch->branch_code,
         ]);
 
         // Generate Token
@@ -88,26 +94,18 @@ class AuthController extends Controller
         ], 201);
     }
 
-
     // Login
     public function login(Request $request)
     {
         $request->validate([
-            'email' => [
-                'required',
-                'email'
-            ],
-
-            'password' => [
-                'required'
-            ],
+            'email' => ['required', 'email'],
+            'password' => ['required'],
         ]);
 
         $user = User::with('branch')
             ->where('email', $request->email)
             ->first();
 
-        // Check credentials
         if (
             !$user ||
             !Hash::check($request->password, $user->password)
@@ -119,7 +117,6 @@ class AuthController extends Controller
             ]);
         }
 
-        // Check User Status
         if (!$user->status) {
             return response()->json([
                 'success' => false,
@@ -127,7 +124,6 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Generate Token
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
@@ -138,7 +134,6 @@ class AuthController extends Controller
             'user'         => $user,
         ], 200);
     }
-
 
     // Logout
     public function logout(Request $request)
@@ -151,16 +146,11 @@ class AuthController extends Controller
         ], 200);
     }
 
-
     // Get Active Branches
     public function getBranches()
     {
         $branches = Branch::where('status', 'Active')
-            ->select(
-                'id',
-                'branch_name',
-                'branch_code'
-            )
+            ->select('id', 'branch_name', 'branch_code')
             ->latest()
             ->get();
 

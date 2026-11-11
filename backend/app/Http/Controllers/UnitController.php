@@ -5,80 +5,141 @@ namespace App\Http\Controllers;
 use App\Models\Unit;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class UnitController extends Controller
 {
-    // Get all units  
-    public function index()
+    // Get all units branch-wise
+    public function index(Request $request)
     {
-        $units = Unit::latest()->get();
+        $branchCode = $request->user()->branch_code;
+
+        if (!$branchCode) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User branch code not found.',
+            ], 403);
+        }
+
+        $units = Unit::where('branch_code', $branchCode)
+            ->latest()
+            ->get();
 
         return response()->json([
-         'success' => true,
-         'message' => 'Units Fetched Successfully',
-         'data'    => $units
+            'success' => true,
+            'message' => 'Units fetched successfully',
+            'data' => $units,
         ], 200);
     }
 
-    // add new units 
-    public function store(Request $request)
-    {
-       $validated = $request->validate([
-        'unit_name'  => 'required|string|max:100',
-        'short_name' => 'required|string|max:20|unique:units,short_name',
-        'status' => 'required|in:Active,Inactive',
-       ]); 
+    // Add new unit
+   
+// Add new unit
+public function store(Request $request)
+{
+    $branchCode = $request->user()->branch_code;
 
-       $unit = Unit::create($validated);
-
-       return response()->json([
-        'success'  => true,
-        'message'  => 'unit created successfully',
-        'data'     => $unit  
-       ],201);
+    if (!$branchCode) {
+        return response()->json([
+            'success' => false,
+            'message' => 'User branch code not found.',
+        ], 403);
     }
 
-   
+    $validated = $request->validate([
+        'unit_name' => 'required|string|max:100',
+
+        'short_name' => [
+            'required',
+            'string',
+            'max:20',
+            Rule::unique('units', 'short_name')
+                ->where('branch_code', $branchCode),
+        ],
+
+        'status' => 'required|in:Active,Inactive',
+    ]);
+
+    $validated['branch_code'] = $branchCode;
+
+    // Create Unit and Generate Unique ID
+    $unit = DB::transaction(function () use ($validated) {
+
+        // Temporary unique ID
+        $validated['unique_id'] = 'TEMP-' . Str::uuid();
+
+        // Create Unit
+        $unit = Unit::create($validated);
+
+        // Generate Final Unique ID
+        $unit->unique_id = 'UNT-' . str_pad(
+            $unit->id, 4, '0', STR_PAD_LEFT
+
+            // 'VND-' . str_pad($vendorId, 4, '0', STR_PAD_LEFT);
+        );
+
+        $unit->save();
+
+        return $unit->fresh();
+    });
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Unit created successfully',
+        'data' => $unit,
+    ], 201);
+}
+
+
+
     // Get single unit
-    // public function show(string $id)
-    // {
-    //     $unit = Unit::find($id);
-
-    //     if (!$unit) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Unit not found'
-    //         ], 404);
-    //     }
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Unit details fetched successfully',
-    //         'data' => $unit
-    //     ], 200);
-    // }
-
-   // Update unit
-    public function update(Request $request, string $id)
+    public function show(Request $request, string $id)
     {
-        $unit = Unit::find($id);
+        $unit = Unit::where('branch_code', $request->user()->branch_code)
+            ->find($id);
 
         if (!$unit) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unit not found'
+                'message' => 'Unit not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Unit details fetched successfully',
+            'data' => $unit,
+        ], 200);
+    }
+
+    // Update unit
+    public function update(Request $request, string $id)
+    {
+        $branchCode = $request->user()->branch_code;
+
+        $unit = Unit::where('branch_code', $branchCode)
+            ->find($id);
+
+        if (!$unit) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unit not found',
             ], 404);
         }
 
         $validated = $request->validate([
             'unit_name' => 'required|string|max:100',
+
             'short_name' => [
                 'required',
                 'string',
                 'max:20',
-                Rule::unique('units', 'short_name')->ignore($unit->id),
+                Rule::unique('units', 'short_name')
+                    ->where('branch_code', $branchCode)
+                    ->ignore($unit->id),
             ],
-            'description' => 'nullable|string',
+
             'status' => 'required|in:Active,Inactive',
         ]);
 
@@ -87,18 +148,20 @@ class UnitController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Unit updated successfully',
-            'data' => $unit->fresh()
+            'data' => $unit->fresh(),
         ], 200);
     }
-// Delete unit
-    public function destroy(string $id)
+
+    // Delete unit
+    public function destroy(Request $request, string $id)
     {
-        $unit = Unit::find($id);
+        $unit = Unit::where('branch_code', $request->user()->branch_code)
+            ->find($id);
 
         if (!$unit) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unit not found'
+                'message' => 'Unit not found',
             ], 404);
         }
 
@@ -106,8 +169,7 @@ class UnitController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Unit deleted successfully'
+            'message' => 'Unit deleted successfully',
         ], 200);
     }
 }
-

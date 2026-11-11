@@ -17,8 +17,11 @@ return new class extends Migration
             $table->string('unique_id', 50)->unique();
 
             // Branch Relationship
-            $table->foreignId('branch_id')
-                ->constrained('branches')
+            $table->string('branch_code', 50);
+
+            $table->foreign('branch_code')
+                ->references('branch_code')
+                ->on('branches')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
@@ -33,14 +36,15 @@ return new class extends Migration
 
             $table->text('description')->nullable();
 
+            // Status
             $table->enum('status', ['Active', 'Inactive'])
                 ->default('Active');
 
             $table->timestamps();
 
-            // Same brand name allowed in different categories
+            // Branch-wise duplicate prevention
             $table->unique(
-                ['branch_id', 'category_id', 'brand_name'],
+                ['branch_code', 'category_id', 'brand_name'],
                 'branch_category_brand_unique'
             );
         });

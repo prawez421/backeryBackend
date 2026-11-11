@@ -33,18 +33,18 @@ class Branch extends Model
     {
         return $this->hasMany(
             User::class,
-            'branch_id',
+            'branch_code',
             'branch_code'
         );
     }
 
-    // Branch has many Vendors using branch primary ID
+    // Branch has many Vendors using branch_code
     public function vendors(): HasMany
     {
         return $this->hasMany(
             Vendor::class,
-            'branch_id',
-            'id'
+            'branch_code',
+            'branch_code'
         );
     }
 }

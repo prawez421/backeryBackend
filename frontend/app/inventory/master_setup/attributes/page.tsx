@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -31,13 +32,16 @@ export default function AttributePage() {
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
+
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
-  // VIEW VALUES MODAL STATE
+  // VIEW VALUES MODAL
   const [viewModal, setViewModal] = useState(false);
-  const [selectedAttribute, setSelectedAttribute] = useState<Attribute | null>(null);
+  const [selectedAttribute, setSelectedAttribute] =
+    useState<Attribute | null>(null);
 
+  // FORM STATES
   const [name, setName] = useState("");
   const [valueInput, setValueInput] = useState("");
   const [values, setValues] = useState<string[]>([]);
@@ -45,15 +49,24 @@ export default function AttributePage() {
   const [status, setStatus] =
     useState<"Active" | "Inactive">("Active");
 
-  // BACKEND RESPONSE KO UI FORMAT MEIN CONVERT KARNA
+  // NORMALIZE BACKEND RESPONSE
   const normalizeAttribute = (item: any): Attribute => ({
     id: Number(item.id),
+
+    
+
     name: item.attribute_name || item.name || "",
+
     values: Array.isArray(item.values)
-      ? item.values.map((value: any) =>
-          typeof value === "string" ? value : value.value
-        ).filter(Boolean)
+      ? item.values
+          .map((value: any) =>
+            typeof value === "string"
+              ? value
+              : value.attribute_value || value.value || ""
+          )
+          .filter(Boolean)
       : [],
+
     status: item.status === "Inactive" ? "Inactive" : "Active",
   });
 
@@ -62,18 +75,32 @@ export default function AttributePage() {
     try {
       setLoading(true);
 
-      const response = await axiosInstance.get(ProjectApiList.attributeList, {
-        params: { per_page: 1000 },
-      });
+      const response = await axiosInstance.get(
+        ProjectApiList.attributeList,
+        {
+          params: {
+            per_page: 1000,
+          },
+        }
+      );
 
       const result = response.data?.data;
-      const rows = Array.isArray(result) ? result : result?.data || [];
 
-      setAttributes(rows.map(normalizeAttribute));
+      // Laravel pagination response
+      const rows = Array.isArray(result)
+        ? result
+        : result?.data || [];
+
+      const formattedAttributes = rows.map(normalizeAttribute);
+
+      setAttributes(formattedAttributes);
+
     } catch (error: any) {
       console.error("Attribute List Error:", error);
+
       toast.error(
-        error.response?.data?.message || "Attribute list load nahi hui"
+        error.response?.data?.message ||
+          "Attribute list load nahi hui"
       );
     } finally {
       setLoading(false);
@@ -154,11 +181,16 @@ export default function AttributePage() {
   };
 
   // ADD / UPDATE ATTRIBUTE
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
 
     const cleanName = name.trim();
-    const cleanValues = values.map((v) => v.trim()).filter(Boolean);
+
+    const cleanValues = values
+      .map((v) => v.trim())
+      .filter(Boolean);
 
     if (!cleanName) {
       toast.error("Attribute name is required");
@@ -195,22 +227,37 @@ export default function AttributePage() {
           ProjectApiList.attributeUpdate(editId),
           payload
         );
+
         toast.success("Attribute successfully updated");
+
       } else {
-        await axiosInstance.post(ProjectApiList.attributeCreate, payload);
+        await axiosInstance.post(
+          ProjectApiList.attributeCreate,
+          payload
+        );
+
         toast.success("Attribute successfully added");
       }
 
       resetForm();
+
       await fetchAttributes();
+
     } catch (error: any) {
       console.error("Save Attribute Error:", error);
+
       const validationMessage = error.response?.data?.errors
         ? Object.values(error.response.data.errors).flat()[0]
         : null;
+
       toast.error(
-        String(validationMessage || error.response?.data?.message || "Attribute save nahi hua")
+        String(
+          validationMessage ||
+            error.response?.data?.message ||
+            "Attribute save nahi hua"
+        )
       );
+
     } finally {
       setSaving(false);
     }
@@ -219,20 +266,32 @@ export default function AttributePage() {
   // DELETE ATTRIBUTE
   const deleteAttribute = async (id: number) => {
     const item = attributes.find((a) => a.id === id);
+
     if (!item) return;
 
-    if (!window.confirm(`Are you sure you want to delete ${item.name}?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${item.name}?`
+      )
+    ) {
       return;
     }
 
     try {
-      await axiosInstance.delete(ProjectApiList.attributeDelete(id));
+      await axiosInstance.delete(
+        ProjectApiList.attributeDelete(id)
+      );
+
       toast.success("Attribute successfully deleted");
+
       await fetchAttributes();
+
     } catch (error: any) {
       console.error("Delete Attribute Error:", error);
+
       toast.error(
-        error.response?.data?.message || "Attribute delete nahi hua"
+        error.response?.data?.message ||
+          "Attribute delete nahi hua"
       );
     }
   };
@@ -288,8 +347,10 @@ export default function AttributePage() {
 
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
         <div>
           <div className="flex items-center gap-2">
+
             <div className="bg-amber-100 p-2 rounded-lg">
               <Package size={23} className="text-amber-700" />
             </div>
@@ -297,6 +358,7 @@ export default function AttributePage() {
             <h1 className="text-2xl font-bold text-gray-800">
               Attribute Master
             </h1>
+
           </div>
 
           <p className="text-sm text-gray-500 mt-2">
@@ -312,10 +374,12 @@ export default function AttributePage() {
           <Plus size={19} />
           Add Attribute
         </button>
+
       </div>
 
       {/* STATISTICS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
         {stats.map((stat) => {
           const Icon = stat.icon;
 
@@ -325,6 +389,7 @@ export default function AttributePage() {
               className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm"
             >
               <div className="flex items-center justify-between">
+
                 <div>
                   <p className="text-xs sm:text-sm text-gray-500">
                     {stat.title}
@@ -338,10 +403,12 @@ export default function AttributePage() {
                 <div className={`p-3 rounded-xl ${stat.color}`}>
                   <Icon size={22} />
                 </div>
+
               </div>
             </div>
           );
         })}
+
       </div>
 
       {/* ATTRIBUTE TABLE */}
@@ -349,6 +416,7 @@ export default function AttributePage() {
 
         {/* SEARCH */}
         <div className="p-4 md:p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+
           <div>
             <h2 className="text-lg font-semibold text-gray-800">
               Attribute List
@@ -360,6 +428,7 @@ export default function AttributePage() {
           </div>
 
           <div className="relative w-full md:w-72">
+
             <Search
               size={18}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
@@ -372,51 +441,72 @@ export default function AttributePage() {
               onChange={(e) => setSearch(e.target.value)}
               className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-400"
             />
+
           </div>
+
         </div>
 
         {/* TABLE */}
         <div className="overflow-x-auto">
+
           <table className="w-full text-sm text-left">
+
             <thead className="bg-gray-50 text-gray-600">
               <tr>
+
                 <th className="px-5 py-4 font-semibold">#</th>
+
                 <th className="px-5 py-4 font-semibold">
                   Attribute Name
                 </th>
+
                 <th className="px-5 py-4 font-semibold">
                   Total Values
                 </th>
+
                 <th className="px-5 py-4 font-semibold">
                   Status
                 </th>
+
                 <th className="px-5 py-4 font-semibold text-center">
                   Action
                 </th>
+
               </tr>
             </thead>
 
             <tbody className="divide-y divide-gray-100">
+
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-gray-500">
+                  <td
+                    colSpan={5}
+                    className="text-center py-12 text-gray-500"
+                  >
                     Loading attributes...
                   </td>
                 </tr>
+
               ) : filteredData.length > 0 ? (
+
                 filteredData.map((item, index) => (
                   <tr
                     key={item.id}
                     className="hover:bg-amber-50/30"
                   >
+
                     <td className="px-5 py-4 text-gray-500">
                       {index + 1}
                     </td>
 
                     <td className="px-5 py-4">
-                      <span className="font-semibold text-gray-800">
-                        {item.name}
-                      </span>
+                      <div>
+                        <span className="font-semibold text-gray-800">
+                          {item.name}
+                        </span>
+
+                        
+                      </div>
                     </td>
 
                     <td className="px-5 py-4">
@@ -439,7 +529,8 @@ export default function AttributePage() {
 
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-center gap-2">
-                        {/* VIEW VALUES BUTTON */}
+
+                        {/* VIEW VALUES */}
                         <button
                           type="button"
                           onClick={() => openViewModal(item)}
@@ -449,6 +540,7 @@ export default function AttributePage() {
                           <Eye size={16} />
                         </button>
 
+                        {/* EDIT */}
                         <button
                           type="button"
                           onClick={() => openEditModal(item)}
@@ -458,6 +550,7 @@ export default function AttributePage() {
                           <Pencil size={16} />
                         </button>
 
+                        {/* DELETE */}
                         <button
                           type="button"
                           onClick={() => deleteAttribute(item.id)}
@@ -466,11 +559,15 @@ export default function AttributePage() {
                         >
                           <Trash2 size={16} />
                         </button>
+
                       </div>
                     </td>
+
                   </tr>
                 ))
+
               ) : (
+
                 <tr>
                   <td
                     colSpan={5}
@@ -480,29 +577,40 @@ export default function AttributePage() {
                       size={30}
                       className="mx-auto mb-2 text-gray-300"
                     />
+
                     No attributes found.
                   </td>
                 </tr>
+
               )}
+
             </tbody>
+
           </table>
+
         </div>
 
         {/* FOOTER */}
         <div className="px-5 py-4 border-t text-sm text-gray-500">
           Showing {filteredData.length} of {attributes.length} attributes
         </div>
+
       </div>
 
       {/* VIEW VALUES MODAL */}
       {viewModal && selectedAttribute && (
+
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+
           <div className="bg-white w-full max-w-md rounded-xl shadow-xl overflow-hidden">
+
             <div className="flex justify-between items-center p-5 border-b">
+
               <div>
                 <h3 className="text-lg font-bold text-gray-800">
                   {selectedAttribute.name} Values
                 </h3>
+
                 <p className="text-xs text-gray-500 mt-0.5">
                   Total {selectedAttribute.values.length} values available
                 </p>
@@ -515,11 +623,15 @@ export default function AttributePage() {
               >
                 <X size={20} />
               </button>
+
             </div>
 
             <div className="p-5 max-h-[60vh] overflow-y-auto">
+
               {selectedAttribute.values.length > 0 ? (
+
                 <div className="flex flex-wrap gap-2">
+
                   {selectedAttribute.values.map((val, idx) => (
                     <span
                       key={idx}
@@ -528,15 +640,21 @@ export default function AttributePage() {
                       {val}
                     </span>
                   ))}
+
                 </div>
+
               ) : (
+
                 <p className="text-sm text-gray-400 text-center py-6">
                   No values found for this attribute.
                 </p>
+
               )}
+
             </div>
 
             <div className="px-5 py-3 bg-gray-50 border-t flex justify-end">
+
               <button
                 type="button"
                 onClick={() => setViewModal(false)}
@@ -544,18 +662,24 @@ export default function AttributePage() {
               >
                 Close
               </button>
+
             </div>
+
           </div>
+
         </div>
       )}
 
       {/* ADD / EDIT MODAL */}
       {showModal && (
+
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+
           <div className="bg-white w-full max-w-xl rounded-xl shadow-xl max-h-[90vh] overflow-y-auto">
 
             {/* MODAL HEADER */}
             <div className="flex justify-between items-center p-5 border-b">
+
               <div>
                 <h2 className="text-lg font-bold text-gray-800">
                   {editId !== null
@@ -575,6 +699,7 @@ export default function AttributePage() {
               >
                 <X size={20} />
               </button>
+
             </div>
 
             <form
@@ -584,6 +709,7 @@ export default function AttributePage() {
 
               {/* ATTRIBUTE NAME */}
               <div>
+
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Attribute Name *
                 </label>
@@ -596,15 +722,18 @@ export default function AttributePage() {
                   required
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-400"
                 />
+
               </div>
 
               {/* ATTRIBUTE VALUES */}
               <div>
+
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Attribute Values *
                 </label>
 
                 <div className="flex gap-2">
+
                   <input
                     type="text"
                     placeholder="Enter attribute value"
@@ -627,16 +756,20 @@ export default function AttributePage() {
                     <Plus size={18} />
                     Add
                   </button>
+
                 </div>
 
                 {/* ADDED VALUES */}
                 <div className="mt-4">
+
                   <p className="text-xs font-medium text-gray-500 mb-2">
                     Added Values ({values.length})
                   </p>
 
                   {values.length > 0 ? (
+
                     <div className="flex flex-wrap gap-2">
+
                       {values.map((value, index) => (
                         <span
                           key={index}
@@ -652,19 +785,27 @@ export default function AttributePage() {
                           >
                             <X size={15} />
                           </button>
+
                         </span>
                       ))}
+
                     </div>
+
                   ) : (
+
                     <p className="text-sm text-gray-400 border border-dashed rounded-lg p-4 text-center">
                       No values added yet
                     </p>
+
                   )}
+
                 </div>
+
               </div>
 
               {/* STATUS */}
               <div>
+
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Status
                 </label>
@@ -681,10 +822,12 @@ export default function AttributePage() {
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
                 </select>
+
               </div>
 
               {/* BUTTONS */}
               <div className="flex justify-end gap-3 pt-4 border-t">
+
                 <button
                   type="button"
                   onClick={resetForm}
@@ -704,10 +847,13 @@ export default function AttributePage() {
                       ? "Update Attribute"
                       : "Save Attribute"}
                 </button>
+
               </div>
 
             </form>
+
           </div>
+
         </div>
       )}
 

@@ -7,20 +7,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('sub_categories', function (Blueprint $table) {
+
             $table->id();
-             // Unique Vendor ID
+
+            // Unique Sub Category ID
             $table->string('unique_id', 50)->unique();
 
-            
-            // Branch Relationship
-            $table->foreignId('branch_id')
-                ->constrained('branches')
+            // Branch Code
+            $table->string('branch_code', 50);
+
+            $table->foreign('branch_code')
+                ->references('branch_code')
+                ->on('branches')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
@@ -38,17 +39,14 @@ return new class extends Migration
 
             $table->timestamps();
 
-            // Same category mein duplicate sub category nahi hogi
+            // Same sub-category allowed in different branches
             $table->unique(
-                ['category_id', 'sub_category_name'],
-                'sub_categories_category_name_unique'
+                ['branch_code', 'category_id', 'sub_category_name'],
+                'branch_category_sub_category_unique'
             );
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('sub_categories');

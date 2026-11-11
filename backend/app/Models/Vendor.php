@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Branch;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Vendor extends Model
@@ -11,7 +10,7 @@ class Vendor extends Model
     protected $fillable = [
         'unique_id',
         'vendor_code',
-        'branch_id',
+        'branch_code',
         'vendor_name',
         'company_name',
         'category',
@@ -33,9 +32,13 @@ class Vendor extends Model
         'opening_balance' => 'decimal:2',
     ];
 
-    // Branch Relationship
+    // Branch Relationship using branch_code
     public function branch(): BelongsTo
     {
-        return $this->belongsTo(Branch::class);
+        return $this->belongsTo(
+            Branch::class,
+            'branch_code',
+            'branch_code'
+        );
     }
 }

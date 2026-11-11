@@ -10,13 +10,29 @@ class AttributeValue extends Model
     protected $table = 'attribute_values';
 
     protected $fillable = [
+        'unique_id',
+        'branch_code',
         'attribute_id',
-        'value',
+        'attribute_value',
         'status',
     ];
 
+    // Branch Relationship
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(
+            Branch::class,
+            'branch_code',
+            'branch_code'
+        );
+    }
+
+    // Attribute Relationship
     public function attribute(): BelongsTo
     {
-        return $this->belongsTo(Attribute::class, 'attribute_id');
+        return $this->belongsTo(
+            Attribute::class,
+            'attribute_id'
+        );
     }
 }

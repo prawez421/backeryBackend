@@ -113,7 +113,7 @@ export default function VendorPage() {
 
       const result = response.data;
 
-      console.log("Vendor API Response:", result);
+      // console.log("Vendor API Response:", result);
 
       if (!result.success) {
         throw new Error(result.message || "Vendor data failed.");

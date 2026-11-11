@@ -18,11 +18,14 @@ return new class extends Migration
             // Vendor Code
             $table->string('vendor_code', 50)->unique();
 
-            // Branch Relationship
-            $table->foreignId('branch_id')
-                ->constrained('branches')
-                ->cascadeOnUpdate()
-                ->restrictOnDelete();
+           // User Branch Code
+$table->string('branch_code', 50)->nullable();
+
+$table->foreign('branch_code')
+    ->references('branch_code')
+    ->on('branches')
+    ->cascadeOnUpdate()
+    ->restrictOnDelete();
 
             $table->string('vendor_name', 150);
             $table->string('company_name', 150)->nullable();

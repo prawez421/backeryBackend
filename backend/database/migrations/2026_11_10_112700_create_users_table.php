@@ -18,12 +18,14 @@ return new class extends Migration
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
 
-            // User Branch
-            $table->foreignId('branch_id')
-                ->nullable()
-                ->constrained('branches')
-                ->cascadeOnUpdate()
-                ->restrictOnDelete();
+            // User Branch Code
+$table->string('branch_code', 50)->nullable();
+
+$table->foreign('branch_code')
+    ->references('branch_code')
+    ->on('branches')
+    ->cascadeOnUpdate()
+    ->restrictOnDelete();
 
             // User Role
             $table->string('role')->default('user');

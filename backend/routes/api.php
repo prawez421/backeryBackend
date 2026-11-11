@@ -11,6 +11,8 @@ use App\Http\Controllers\SubCategoryController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\AttributeValueController;
  use App\Http\Controllers\BranchController;
+  use App\Http\Controllers\BrandController;
+
 
 
 // Register
@@ -30,8 +32,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
    
-
-
     // Vendor CRUD Routes
     Route::apiResource('vendors', VendorController::class);
 
@@ -43,6 +43,8 @@ Route::middleware('auth:sanctum')->group(function () {
          // sub_category
      Route::apiResource('sub-categories',SubCategoryController::class);
 
+          // brands
+          Route::apiResource('brands',SubCategoryController::class);
 
         // Attribute Master
     Route::apiResource('attributes', AttributeController::class);

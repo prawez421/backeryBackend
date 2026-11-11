@@ -10,20 +10,24 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('units', function (Blueprint $table) {
+
             $table->id();
-             // Unique Vendor ID
+
+            // Unique Unit ID
             $table->string('unique_id', 50)->unique();
 
-            // Branch Relationship
-            $table->foreignId('branch_id')
-                ->constrained('branches')
+            // Branch Code
+            $table->string('branch_code', 50);
+
+            $table->foreign('branch_code')
+                ->references('branch_code')
+                ->on('branches')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
             // Unit Information
             $table->string('unit_name', 100);
-            $table->string('short_name', 20)->unique();
-
+            $table->string('short_name', 20);
 
             // Status
             $table->enum('status', [
@@ -32,6 +36,12 @@ return new class extends Migration
             ])->default('Active');
 
             $table->timestamps();
+
+            // Branch-wise Unique Short Name
+            $table->unique(
+                ['branch_code', 'short_name'],
+                'branch_unit_short_name_unique'
+            );
         });
     }
 
