@@ -1,9 +1,9 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import axiosInstance from "@/app/api/axiosInstance";
 import ProjectApiList from "@/app/api/ProjectApiList";
+import { STORAGE_URL } from "@/app/api/BaseUrls";
 import {
   Plus,
   Search,
@@ -15,33 +15,23 @@ import {
   XCircle,
   Package,
   Eye,
-  Building2,
+  ImagePlus,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 
-interface SubCategory {
-  id: number;
-  unique_id?: string;
-  category_id: number;
-  sub_category_name: string;
-  status: "Active" | "Inactive";
-}
-
 interface Category {
   id: number;
-  unique_id?: string;
-  branch_code?: string;
   category_name: string;
-  status: "Active" | "Inactive";
-  sub_categories?: SubCategory[];
+  status?: "Active" | "Inactive";
 }
 
 interface Brand {
   id: number;
-  unique_id?: string;
   category_id: number;
-  category?: Category;
+  category?: Category | null;
   brand_name: string;
+  brand_logo: string | null;
   description: string | null;
   status: "Active" | "Inactive";
 }
@@ -49,8 +39,8 @@ interface Brand {
 export default function BrandPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-
   const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState("");
@@ -59,23 +49,43 @@ export default function BrandPage() {
   const [viewModal, setViewModal] = useState(false);
 
   const [editId, setEditId] = useState<number | null>(null);
-  const [selectedBrand, setSelectedBrand] =
-    useState<Brand | null>(null);
+  const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
 
   // FORM STATES
   const [categoryId, setCategoryId] = useState("");
   const [brandName, setBrandName] = useState("");
   const [description, setDescription] = useState("");
-  const [status, setStatus] =
-    useState<"Active" | "Inactive">("Active");
+  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
+
+  const [brandLogo, setBrandLogo] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // IMAGE URL
+  const getImageUrl = (path?: string | null) => {
+    if (!path) return "";
+
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return path;
+    }
+
+    return `${STORAGE_URL.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
+  };
 
   // NORMALIZE BRAND RESPONSE
   const normalizeBrand = (item: any): Brand => ({
     id: Number(item.id),
-    unique_id: item.unique_id || "",
     category_id: Number(item.category_id),
-    category: item.category || undefined,
+    category: item.category
+      ? {
+          id: Number(item.category.id),
+          category_name: item.category.category_name || "",
+          status: item.category.status,
+        }
+      : null,
     brand_name: item.brand_name || "",
+    brand_logo: item.brand_logo || null,
     description: item.description || "",
     status: item.status === "Inactive" ? "Inactive" : "Active",
   });
@@ -84,6 +94,7 @@ export default function BrandPage() {
   const fetchBrands = async () => {
     try {
       setLoading(true);
+      setCategoriesLoading(true);
 
       const response = await axiosInstance.get(
         ProjectApiList.brandList,
@@ -92,71 +103,39 @@ export default function BrandPage() {
         }
       );
 
-      const responseData = response.data;
-      const result = responseData?.data;
+      // BrandController returns categories separately from paginated brands.
+      const categoryRows = response.data?.categories;
+      setCategories(
+        Array.isArray(categoryRows)
+          ? categoryRows
+              .map((item: any) => ({
+                id: Number(item.id),
+                category_name: item.category_name || "",
+                status: item.status,
+              }))
+              .filter((item: Category) => item.id && item.category_name)
+          : []
+      );
 
-      /*
-        Supported response formats:
-
-        1. Combined BrandController response:
-           data: {
-             brands: { data: [...] },
-             categories: [...]
-           }
-
-        2. Direct category response:
-           data: [
-             { id, category_name, status, sub_categories: [...] }
-           ]
-      */
-
-      const brandPayload =
-        result?.brands ?? responseData?.brands ?? [];
-
-      const brandRows = Array.isArray(brandPayload?.data)
-        ? brandPayload.data
-        : Array.isArray(brandPayload)
-          ? brandPayload
-          : [];
-
-      const categoryPayload =
-        result?.categories ??
-        responseData?.categories ??
-        (Array.isArray(result) ? result : []);
-
-      const categoryRows = Array.isArray(categoryPayload?.data)
-        ? categoryPayload.data
-        : Array.isArray(categoryPayload)
-          ? categoryPayload
+      // Laravel paginator response: response.data.data.data
+      const result = response.data?.data;
+      const brandRows = Array.isArray(result)
+        ? result
+        : Array.isArray(result?.data)
+          ? result.data
           : [];
 
       setBrands(brandRows.map(normalizeBrand));
-
-      setCategories(
-        categoryRows
-          .filter(
-            (item: any) => item.status === "Active"
-          )
-          .map((item: any) => ({
-            id: Number(item.id),
-            unique_id: item.unique_id || "",
-            branch_code: item.branch_code || "",
-            category_name: item.category_name || "",
-            status: item.status,
-            sub_categories: Array.isArray(item.sub_categories)
-              ? item.sub_categories
-              : [],
-          }))
-      );
     } catch (error: any) {
       console.error("Brand List Error:", error);
 
       toast.error(
         error.response?.data?.message ||
-          "Brand aur category data load nahi hua"
+          "Failed to load brands and categories. Please try again."
       );
     } finally {
       setLoading(false);
+      setCategoriesLoading(false);
     }
   };
 
@@ -164,33 +143,54 @@ export default function BrandPage() {
     fetchBrands();
   }, []);
 
+  // Revoke temporary preview URLs when the preview changes or component unmounts.
+  useEffect(() => {
+    if (!logoPreview.startsWith("blob:")) return;
+
+    return () => {
+      URL.revokeObjectURL(logoPreview);
+    };
+  }, [logoPreview]);
+
   // RESET FORM
   const resetForm = () => {
+    setLogoPreview("");
     setCategoryId("");
     setBrandName("");
     setDescription("");
     setStatus("Active");
+
+    setBrandLogo(null);
+    setRemoveLogo(false);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+
     setEditId(null);
     setShowModal(false);
   };
 
   // OPEN ADD MODAL
   const openAddModal = () => {
-    setCategoryId("");
-    setBrandName("");
-    setDescription("");
-    setStatus("Active");
-    setEditId(null);
+    resetForm();
     setShowModal(true);
   };
 
   // OPEN EDIT MODAL
   const openEditModal = (item: Brand) => {
     setEditId(item.id);
-    setCategoryId(String(item.category_id));
+    setCategoryId(String(item.category_id || item.category?.id || ""));
     setBrandName(item.brand_name);
     setDescription(item.description || "");
     setStatus(item.status);
+
+    setBrandLogo(null);
+    setLogoPreview(getImageUrl(item.brand_logo));
+    setRemoveLogo(false);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+
     setShowModal(true);
   };
 
@@ -198,6 +198,40 @@ export default function BrandPage() {
   const openViewModal = (item: Brand) => {
     setSelectedBrand(item);
     setViewModal(true);
+  };
+
+  // HANDLE IMAGE SELECT
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    // Reset input so the same file can be selected again later.
+    e.target.value = "";
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid JPG, PNG, or WEBP image.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image size must not exceed 2 MB.");
+      return;
+    }
+
+    setLogoPreview(URL.createObjectURL(file));
+    setBrandLogo(file);
+    setRemoveLogo(false);
+  };
+
+  // REMOVE SELECTED LOGO
+  const handleRemoveLogo = () => {
+    setLogoPreview("");
+    setBrandLogo(null);
+    setRemoveLogo(true);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
   };
 
   // ADD / UPDATE BRAND
@@ -209,7 +243,7 @@ export default function BrandPage() {
     const cleanName = brandName.trim();
 
     if (!categoryId) {
-      toast.error("Please select category");
+      toast.error("Please select a category.");
       return;
     }
 
@@ -218,40 +252,48 @@ export default function BrandPage() {
       return;
     }
 
-    // Frontend duplicate check within category
+    // FRONTEND DUPLICATE CHECK
     const duplicate = brands.some(
       (item) =>
-        item.category_id === Number(categoryId) &&
-        item.brand_name.toLowerCase() === cleanName.toLowerCase() &&
+        (item.brand_name || "").trim().toLowerCase() === cleanName.toLowerCase() &&
         item.id !== editId
     );
 
     if (duplicate) {
-      toast.error("Brand already exists in this category");
+      toast.error("Brand already exists");
       return;
     }
 
-    const payload = {
-      category_id: Number(categoryId),
-      brand_name: cleanName,
-      description: description.trim() || null,
-      status,
-    };
+    const formData = new FormData();
+
+    formData.append("category_id", categoryId);
+    formData.append("brand_name", cleanName);
+    formData.append("description", description.trim());
+    formData.append("status", status);
+
+    if (brandLogo) {
+      formData.append("brand_logo", brandLogo);
+    }
+
+    if (editId !== null) {
+      formData.append("remove_logo", removeLogo ? "1" : "0");
+    }
 
     try {
       setSaving(true);
 
       if (editId !== null) {
-        await axiosInstance.put(
+        // Laravel BrandController update route uses POST
+        await axiosInstance.post(
           ProjectApiList.brandUpdate(editId),
-          payload
+          formData
         );
 
         toast.success("Brand updated successfully");
       } else {
         await axiosInstance.post(
           ProjectApiList.brandCreate,
-          payload
+          formData
         );
 
         toast.success("Brand added successfully");
@@ -259,19 +301,19 @@ export default function BrandPage() {
 
       resetForm();
       await fetchBrands();
-
     } catch (error: any) {
       console.error("Save Brand Error:", error);
 
-      const validationMessage = error.response?.data?.errors
-        ? Object.values(error.response.data.errors).flat()[0]
+      const validationErrors = error.response?.data?.errors;
+      const validationMessage = validationErrors
+        ? Object.values(validationErrors).flat().join(" ")
         : null;
 
       toast.error(
         String(
           validationMessage ||
             error.response?.data?.message ||
-            "Brand save nahi hua"
+            "Failed to save brand. Please try again."
         )
       );
     } finally {
@@ -301,13 +343,11 @@ export default function BrandPage() {
       toast.success("Brand deleted successfully");
 
       await fetchBrands();
-
     } catch (error: any) {
       console.error("Delete Brand Error:", error);
 
       toast.error(
-        error.response?.data?.message ||
-          "Brand delete nahi hua"
+        error.response?.data?.message || "Failed to delete brand. Please try again."
       );
     }
   };
@@ -317,11 +357,8 @@ export default function BrandPage() {
     const searchText = search.toLowerCase();
 
     return (
-      item.brand_name.toLowerCase().includes(searchText) ||
-      item.category?.category_name
-        ?.toLowerCase()
-        .includes(searchText) ||
-      item.unique_id?.toLowerCase().includes(searchText)
+      (item.brand_name || "").toLowerCase().includes(searchText) ||
+      (item.category?.category_name || "").toLowerCase().includes(searchText)
     );
   });
 
@@ -335,25 +372,15 @@ export default function BrandPage() {
     },
     {
       title: "Active Brands",
-      value: brands.filter(
-        (item) => item.status === "Active"
-      ).length,
+      value: brands.filter((item) => item.status === "Active").length,
       icon: CheckCircle,
       color: "bg-green-50 text-green-600",
     },
     {
       title: "Inactive Brands",
-      value: brands.filter(
-        (item) => item.status === "Inactive"
-      ).length,
+      value: brands.filter((item) => item.status === "Inactive").length,
       icon: XCircle,
       color: "bg-red-50 text-red-600",
-    },
-    {
-      title: "Categories Used",
-      value: new Set(brands.map((item) => item.category_id)).size,
-      icon: Building2,
-      color: "bg-amber-50 text-amber-600",
     },
   ];
 
@@ -374,7 +401,7 @@ export default function BrandPage() {
           </div>
 
           <p className="text-sm text-gray-500 mt-2">
-            Manage bakery product brands and categories.
+            Manage your bakery product brands.
           </p>
         </div>
 
@@ -389,7 +416,7 @@ export default function BrandPage() {
       </div>
 
       {/* STATISTICS */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {stats.map((stat) => {
           const Icon = stat.icon;
 
@@ -441,7 +468,7 @@ export default function BrandPage() {
 
             <input
               type="text"
-              placeholder="Search brand or category..."
+              placeholder="Search brand..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-400"
@@ -455,9 +482,9 @@ export default function BrandPage() {
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="px-5 py-4 font-semibold">#</th>
-                <th className="px-5 py-4 font-semibold">Brand ID</th>
-                <th className="px-5 py-4 font-semibold">Brand Name</th>
+                <th className="px-5 py-4 font-semibold">Logo</th>
                 <th className="px-5 py-4 font-semibold">Category</th>
+                <th className="px-5 py-4 font-semibold">Brand Name</th>
                 <th className="px-5 py-4 font-semibold">Description</th>
                 <th className="px-5 py-4 font-semibold">Status</th>
                 <th className="px-5 py-4 font-semibold text-center">Action</th>
@@ -484,23 +511,28 @@ export default function BrandPage() {
                       {index + 1}
                     </td>
 
-                    <td className="px-5 py-4 text-xs font-medium text-gray-500">
-                      {item.unique_id || "-"}
+                   
+                    <td className="px-5 py-4">
+                      {item.brand_logo ? (
+                        <img
+                          src={getImageUrl(item.brand_logo)}
+                          alt={item.brand_name}
+                          className="w-12 h-12 rounded-lg object-cover border border-gray-200"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-lg bg-amber-50 flex items-center justify-center border border-amber-100">
+                          <Tags size={20} className="text-amber-500" />
+                        </div>
+                      )}
+                    </td>
+
+                    <td className="px-5 py-4 text-gray-600">
+                      {item.category?.category_name || "-"}
                     </td>
 
                     <td className="px-5 py-4">
                       <span className="font-semibold text-gray-800">
                         {item.brand_name}
-                      </span>
-                    </td>
-
-                    <td className="px-5 py-4">
-                      <span className="bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1 rounded-full text-xs font-medium">
-                        {item.category?.category_name ||
-                          categories.find(
-                            (cat) => cat.id === item.category_id
-                          )?.category_name ||
-                          "-"}
                       </span>
                     </td>
 
@@ -524,7 +556,6 @@ export default function BrandPage() {
 
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-center gap-2">
-
                         <button
                           type="button"
                           onClick={() => openViewModal(item)}
@@ -551,7 +582,6 @@ export default function BrandPage() {
                         >
                           <Trash2 size={16} />
                         </button>
-
                       </div>
                     </td>
                   </tr>
@@ -591,9 +621,7 @@ export default function BrandPage() {
                   Brand Details
                 </h3>
 
-                <p className="text-xs text-gray-500 mt-1">
-                  {selectedBrand.unique_id}
-                </p>
+               
               </div>
 
               <button
@@ -607,33 +635,52 @@ export default function BrandPage() {
 
             <div className="p-5 space-y-4">
 
+              {/* BRAND LOGO */}
+              <div className="flex justify-center">
+                {selectedBrand.brand_logo ? (
+                  <img
+                    src={getImageUrl(selectedBrand.brand_logo)}
+                    alt={selectedBrand.brand_name}
+                    className="w-28 h-28 rounded-xl object-cover border border-gray-200"
+                  />
+                ) : (
+                  <div className="w-28 h-28 rounded-xl bg-amber-50 flex items-center justify-center border border-amber-100">
+                    <Tags size={38} className="text-amber-500" />
+                  </div>
+                )}
+              </div>
+
               <div>
-                <p className="text-xs text-gray-500 mb-1">Brand Name</p>
+                <p className="text-xs text-gray-500 mb-1">
+                  Category
+                </p>
+                <p className="font-medium text-gray-800">
+                  {selectedBrand.category?.category_name || "Category not available"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Brand Name
+                </p>
                 <p className="font-semibold text-gray-800">
                   {selectedBrand.brand_name}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 mb-1">Category</p>
-                <p className="font-medium text-gray-800">
-                  {selectedBrand.category?.category_name ||
-                    categories.find(
-                      (cat) => cat.id === selectedBrand.category_id
-                    )?.category_name ||
-                    "-"}
+                <p className="text-xs text-gray-500 mb-1">
+                  Description
                 </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Description</p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">
                   {selectedBrand.description || "No description available"}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 mb-1">Status</p>
+                <p className="text-xs text-gray-500 mb-1">
+                  Status
+                </p>
                 <span
                   className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
                     selectedBrand.status === "Active"
@@ -703,25 +750,82 @@ export default function BrandPage() {
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-400"
+                  disabled={categoriesLoading}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-400 disabled:bg-gray-100"
                 >
-                  <option value="">Select Category</option>
+                  <option value="">
+                    {categoriesLoading ? "Loading categories..." : "Select Category"}
+                  </option>
 
                   {categories.map((category) => (
-                    <option
-                      key={category.id}
-                      value={category.id}
-                    >
+                    <option key={category.id} value={category.id}>
                       {category.category_name}
+                      {category.status === "Inactive" ? " (Inactive)" : ""}
                     </option>
                   ))}
                 </select>
 
-                {categories.length === 0 && (
-                  <p className="text-xs text-red-500 mt-2">
-                    No active categories available.
+                {!categoriesLoading && categories.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    No categories found. Please create a category first.
                   </p>
                 )}
+              </div>
+
+              {/* BRAND LOGO */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Brand Logo
+                </label>
+
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+
+                  {/* IMAGE PREVIEW */}
+                  <div className="w-28 h-28 rounded-xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview}
+                        alt="Brand preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="text-center text-gray-400">
+                        <ImagePlus size={28} className="mx-auto mb-1" />
+                        <span className="text-xs">No Image</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="inline-flex items-center gap-2 cursor-pointer bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-4 py-2 rounded-lg text-sm font-medium">
+                      <Upload size={16} />
+                      Choose Logo
+
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        onChange={handleLogoChange}
+                        className="hidden"
+                      />
+                    </label>
+
+                    <p className="text-xs text-gray-500">
+                      JPG, JPEG, PNG, WEBP. Maximum 2MB.
+                    </p>
+
+                    {logoPreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 size={14} />
+                        Remove Logo
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* BRAND NAME */}
@@ -765,9 +869,7 @@ export default function BrandPage() {
                 <select
                   value={status}
                   onChange={(e) =>
-                    setStatus(
-                      e.target.value as "Active" | "Inactive"
-                    )
+                    setStatus(e.target.value as "Active" | "Inactive")
                   }
                   className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-400"
                 >
@@ -778,7 +880,6 @@ export default function BrandPage() {
 
               {/* BUTTONS */}
               <div className="flex justify-end gap-3 pt-4 border-t">
-
                 <button
                   type="button"
                   onClick={resetForm}
@@ -789,7 +890,7 @@ export default function BrandPage() {
 
                 <button
                   type="submit"
-                  disabled={saving || categories.length === 0}
+                  disabled={saving || categoriesLoading || categories.length === 0}
                   className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-lg font-medium"
                 >
                   {saving
@@ -798,11 +899,9 @@ export default function BrandPage() {
                       ? "Update Brand"
                       : "Save Brand"}
                 </button>
-
               </div>
 
             </form>
-
           </div>
         </div>
       )}

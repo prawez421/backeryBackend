@@ -7,25 +7,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Brand extends Model
 {
-    protected $table = 'brands';
-
     protected $fillable = [
         'unique_id',
         'branch_code',
         'category_id',
         'brand_name',
+        'brand_logo',
         'description',
         'status',
     ];
-
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(
-            Branch::class,
-            'branch_code',
-            'branch_code'
-        );
-    }
 
     public function category(): BelongsTo
     {

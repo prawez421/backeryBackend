@@ -12,28 +12,30 @@ use Illuminate\Support\Facades\DB;
 class SubCategoryController extends Controller
 {
     // GET: All Sub Categories
-    public function index(Request $request)
-    {
-        $branchCode = $request->user()->branch_code;
+  
+// GET: All Sub Categories
+public function index(Request $request)
+{
+    $branchCode = $request->user()->branch_code;
 
-        $categories = Category::where('branch_code', $branchCode)
-            ->where('status', 'Active')
-            ->with([
-                'subCategories' => function ($query) use ($branchCode) {
-                    $query->where('branch_code', $branchCode)
-                        ->latest();
-                }
-            ])
-            ->latest()
-            ->get();
+    $categories = Category::where('branch_code', $branchCode)
+        ->with([
+            'subCategories' => function ($query) use ($branchCode) {
+                $query->where('branch_code', $branchCode)
+                    ->latest();
+            }
+        ])
+        ->latest()
+        ->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Active Categories and Sub Categories Fetched Successfully',
-            'total_categories' => $categories->count(),
-            'data' => $categories,
-        ], 200);
-    }
+    return response()->json([
+        'success' => true,
+        'message' => 'Categories and Sub Categories Fetched Successfully',
+        'total_categories' => $categories->count(),
+        'data' => $categories,
+    ], 200);
+}
+
 
     // POST: Add Sub Category
     public function store(Request $request)

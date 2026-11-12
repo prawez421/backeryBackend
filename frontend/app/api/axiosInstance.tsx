@@ -9,7 +9,6 @@ const axiosInstance = axios.create({
   baseURL: BASE_URL,
   headers: {
     Accept: "application/json",
-    "Content-Type": "application/json",
   },
   withCredentials: false,
 });
@@ -26,7 +25,6 @@ export const getToken = () => {
   if (typeof window !== "undefined") {
     return localStorage.getItem(TOKEN_KEY);
   }
-
   return null;
 };
 
@@ -48,7 +46,6 @@ export const getUser = () => {
       return null;
     }
   }
-
   return null;
 };
 

@@ -34,6 +34,10 @@ return new class extends Migration
             // Brand Details
             $table->string('brand_name', 150);
 
+            // Brand Logo
+            $table->string('brand_logo')->nullable();
+
+            // Description
             $table->text('description')->nullable();
 
             // Status
@@ -44,9 +48,10 @@ return new class extends Migration
 
             // Branch-wise duplicate prevention
             $table->unique(
-                ['branch_code', 'category_id', 'brand_name'],
-                'branch_category_brand_unique'
+                ['branch_code', 'brand_name'],
+                'branch_brand_name_unique'
             );
+
         });
     }
 

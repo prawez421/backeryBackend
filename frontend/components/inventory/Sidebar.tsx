@@ -50,12 +50,12 @@ const masterItems = [
 { label: "Brands Master", href: "/inventory/master_setup/brands", icon: Tags },
   { label: "Attribute Master", href: "/inventory/master_setup/attributes", icon: Settings2 },
   { label: "Product Master", href: "/inventory/master_setup/products", icon: Package },
-  { label: "Raw Material Master", href: "/inventory/master_setup/raw-materials", icon: Layers },
-  { label: "Recipe Master", href: "/inventory/master_setup/recipes", icon: ChefHat },
+  // { label: "Raw Material Master", href: "/inventory/master_setup/raw-materials", icon: Layers },
+  // { label: "Recipe Master", href: "/inventory/master_setup/recipes", icon: ChefHat },
 ];
 
 const menuItems = [
-  { label: "Purchase / Stock In", href: "/inventory/stock-in", icon: ArrowDownToLine },
+  { label: "Purchase ", href: "/inventory/purchase", icon: ArrowDownToLine },
   { label: "Production Management", href: "/inventory/production", icon: Factory },
   { label: "Stock Out / Consumption", href: "/inventory/stock-out", icon: ArrowUpFromLine },
   { label: "Finished Goods", href: "/inventory/finished-goods", icon: Cake },

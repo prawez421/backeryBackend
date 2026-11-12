@@ -1,19 +1,20 @@
-
 <?php
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VendorController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\SubCategoryController;
 use App\Http\Controllers\AttributeController;
 use App\Http\Controllers\AttributeValueController;
- use App\Http\Controllers\BranchController;
-  use App\Http\Controllers\BrandController;
+use App\Http\Controllers\BranchController;
+use App\Http\Controllers\BrandController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\PurchaseController;
 
 
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 // Register
 Route::post('/register', [AuthController::class, 'register']);
@@ -21,6 +22,7 @@ Route::post('/register', [AuthController::class, 'register']);
 // Login
 Route::post('/login', [AuthController::class, 'login']);
 
+// Branches
 Route::apiResource('branches', BranchController::class);
 
 // Protected Routes
@@ -31,29 +33,48 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
-   
     // Vendor CRUD Routes
     Route::apiResource('vendors', VendorController::class);
 
     // Units CRUD Routes
-    Route::apiResource('units',UnitController::class);
+    Route::apiResource('units', UnitController::class);
 
-    // Category
-    Route::apiResource('categories',CategoryController::class);
-         // sub_category
-     Route::apiResource('sub-categories',SubCategoryController::class);
+    // Category CRUD Routes
+    Route::apiResource('categories', CategoryController::class);
 
-          // brands
-          Route::apiResource('brands',SubCategoryController::class);
+    // Sub-Category CRUD Routes
+    Route::apiResource('sub-categories', SubCategoryController::class);
 
-        // Attribute Master
+    // Brand Routes
+    Route::get('/brands', [BrandController::class, 'index']);
+    Route::post('/brands', [BrandController::class, 'store']);
+    Route::get('/brands/{id}', [BrandController::class, 'show']);
+    Route::post('/brands/{id}', [BrandController::class, 'update']);
+    Route::delete('/brands/{id}', [BrandController::class, 'destroy']);
+
+    // Attribute Master
     Route::apiResource('attributes', AttributeController::class);
 
-      // Attribute Values
+    // Attribute Values
     Route::get('attribute-values', [AttributeValueController::class, 'index']);
     Route::get('attribute-values/{id}', [AttributeValueController::class, 'show']);
     Route::put('attribute-values/{id}', [AttributeValueController::class, 'update']);
     Route::delete('attribute-values/{id}', [AttributeValueController::class, 'destroy']);
+
+    // products 
+    Route::get('/products', [ProductController::class, 'index']);
+    Route::post('/products', [ProductController::class, 'store']);
+    Route::get('/products/{id}', [ProductController::class, 'show']);
+    Route::post('/products/{id}', [ProductController::class, 'update']);
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+
+    // purchases  
+    Route::get('/purchases', [PurchaseController::class, 'index']);
+    Route::post('/purchases', [PurchaseController::class, 'store']);
+    Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
+    // Update using POST
+    Route::post('/purchases/{id}', [PurchaseController::class, 'update']);
+    Route::delete('/purchases/{id}', [PurchaseController::class, 'destroy']);
 
     // Logout
     Route::post('/logout', [AuthController::class, 'logout']);
