@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+
 class Category extends Model
 {
     protected $table = 'categories';
@@ -35,4 +36,11 @@ class Category extends Model
             'category_id'
         );
     }
+
+    public function attributes(): HasMany
+{
+    return $this->hasMany(Attribute::class, 'category_id');
+}
+   
+
 }

@@ -7,8 +7,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PurchaseItem extends Model
 {
-    protected $table = 'purchase_items';
-
     protected $fillable = [
         'purchase_id',
         'product_id',
@@ -21,25 +19,15 @@ class PurchaseItem extends Model
         'total_amount',
     ];
 
-    protected $casts = [
-        'quantity' => 'decimal:3',
-        'purchase_price' => 'decimal:2',
-        'mrp' => 'decimal:2',
-        'selling_price' => 'decimal:2',
-        'discount' => 'decimal:2',
-        'tax' => 'decimal:2',
-        'total_amount' => 'decimal:2',
-    ];
-
+    // Purchase Relationship
     public function purchase(): BelongsTo
     {
-        return $this->belongsTo(Purchase::class);
+        return $this->belongsTo(Purchase::class, 'purchase_id', 'id');
     }
 
+    // Product Relationship
     public function product(): BelongsTo
     {
-        return $this->belongsTo(Product::class);
+        return $this->belongsTo(Product::class, 'product_id', 'id');
     }
 }
-
-

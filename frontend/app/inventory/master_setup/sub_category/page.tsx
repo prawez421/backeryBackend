@@ -128,7 +128,7 @@ export default function SubCategoryMasterPage() {
 
       toast.error(
         error.response?.data?.message ||
-          "Sub Category list load nahi hui"
+        "Sub Category list load nahi hui"
       );
     } finally {
       setLoading(false);
@@ -362,7 +362,7 @@ export default function SubCategoryMasterPage() {
       } else {
         toast.error(
           error.response?.data?.message ||
-            "Something went wrong"
+          "Something went wrong"
         );
       }
     } finally {
@@ -377,6 +377,7 @@ export default function SubCategoryMasterPage() {
   const handleDelete = async () => {
     if (!selectedSubCategory) return;
 
+
     try {
       setSaving(true);
 
@@ -384,21 +385,43 @@ export default function SubCategoryMasterPage() {
         ProjectApiList.subCategoryDelete(selectedSubCategory.id)
       );
 
-      toast.success("Sub Category successfully deleted");
+      toast.success("Subcategory deleted successfully.");
 
       closeModal();
 
       await fetchSubCategories();
-    } catch (error: any) {
-      console.error("Sub Category Delete Error:", error);
 
-      toast.error(
-        error.response?.data?.message ||
-          "Sub Category delete nahi hui"
-      );
+    } catch (error: any) {
+      console.error("Subcategory Delete Error:", error);
+
+      const status = error.response?.status;
+      const errorMessage = error.response?.data?.message;
+
+      let message = "Unable to delete subcategory. Please try again.";
+
+      if (!error.response) {
+        message = "Network error. Please check your internet connection and try again.";
+      } else if (status === 401) {
+        message = "Your session has expired. Please log in again.";
+      } else if (status === 403) {
+        message = "You do not have permission to delete this subcategory.";
+      } else if (status === 404) {
+        message = "Subcategory not found. It may have already been deleted.";
+      } else if (status === 422) {
+        message =
+          errorMessage ||
+          "This subcategory cannot be deleted because it is being used by existing products.";
+      } else if (status === 500) {
+        message = "A server error occurred while deleting the subcategory. Please contact support.";
+      } else if (errorMessage) {
+        message = errorMessage;
+      }
+      toast.error(message);
+
     } finally {
       setSaving(false);
     }
+
   };
 
   /* =========================
@@ -873,12 +896,11 @@ export default function SubCategoryMasterPage() {
               Are you sure?
             </h3>
 
+
             <p className="mt-2 text-sm text-gray-500">
-              Kya aap{" "}
-              <strong>
-                {selectedSubCategory.sub_category_name}
-              </strong>{" "}
-              sub category delete karna chahte hain?
+              Are you sure you want to delete the{" "}
+              <strong> {selectedSubCategory.sub_category_name}</strong>{" "}
+              sub category?
             </p>
 
             <div className="mt-6 flex justify-center gap-3">
@@ -967,11 +989,10 @@ function StatusBadge({
 }) {
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        status === "Active"
-          ? "bg-green-100 text-green-700"
-          : "bg-red-100 text-red-700"
-      }`}
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${status === "Active"
+        ? "bg-green-100 text-green-700"
+        : "bg-red-100 text-red-700"
+        }`}
     >
       {status}
     </span>

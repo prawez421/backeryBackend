@@ -19,15 +19,23 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+interface Category {
+  id: number;
+  category_name: string;
+}
+
 interface Attribute {
   id: number;
   name: string;
+  category_id: number;
+  category_name: string;
   values: string[];
   status: "Active" | "Inactive";
 }
 
 export default function AttributePage() {
   const [attributes, setAttributes] = useState<Attribute[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -43,6 +51,7 @@ export default function AttributePage() {
 
   // FORM STATES
   const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [valueInput, setValueInput] = useState("");
   const [values, setValues] = useState<string[]>([]);
 
@@ -52,10 +61,13 @@ export default function AttributePage() {
   // NORMALIZE BACKEND RESPONSE
   const normalizeAttribute = (item: any): Attribute => ({
     id: Number(item.id),
-
-    
-
     name: item.attribute_name || item.name || "",
+    category_id: Number(item.category_id || item.category?.id || 0),
+    category_name:
+      item.category?.category_name ||
+      item.category?.name ||
+      item.category_name ||
+      "",
 
     values: Array.isArray(item.values)
       ? item.values
@@ -69,6 +81,29 @@ export default function AttributePage() {
 
     status: item.status === "Inactive" ? "Inactive" : "Active",
   });
+
+  // GET CATEGORY LIST
+  const fetchCategories = async () => {
+    try {
+      const response = await axiosInstance.get(
+        ProjectApiList.categoryList,
+        { params: { per_page: 1000 } }
+      );
+
+      const result = response.data?.data;
+      const rows = Array.isArray(result) ? result : result?.data || [];
+
+      setCategories(
+        rows.map((item: any) => ({
+          id: Number(item.id),
+          category_name: item.category_name || item.name || "",
+        }))
+      );
+    } catch (error: any) {
+      console.error("Category List Error:", error);
+      toast.error(error.response?.data?.message || "Category list load nahi hui");
+    }
+  };
 
   // GET ATTRIBUTE LIST
   const fetchAttributes = async () => {
@@ -109,11 +144,13 @@ export default function AttributePage() {
 
   useEffect(() => {
     fetchAttributes();
+    fetchCategories();
   }, []);
 
   // RESET FORM
   const resetForm = () => {
     setName("");
+    setCategoryId("");
     setValueInput("");
     setValues([]);
     setStatus("Active");
@@ -124,6 +161,7 @@ export default function AttributePage() {
   // OPEN ADD MODAL
   const openAddModal = () => {
     setName("");
+    setCategoryId("");
     setValueInput("");
     setValues([]);
     setStatus("Active");
@@ -173,6 +211,7 @@ export default function AttributePage() {
   // EDIT ATTRIBUTE
   const openEditModal = (item: Attribute) => {
     setEditId(item.id);
+    setCategoryId(String(item.category_id || ""));
     setName(item.name);
     setValues([...item.values]);
     setValueInput("");
@@ -191,6 +230,11 @@ export default function AttributePage() {
     const cleanValues = values
       .map((v) => v.trim())
       .filter(Boolean);
+
+    if (!categoryId) {
+      toast.error("Please select a category");
+      return;
+    }
 
     if (!cleanName) {
       toast.error("Attribute name is required");
@@ -214,6 +258,7 @@ export default function AttributePage() {
     }
 
     const payload = {
+      category_id: Number(categoryId),
       attribute_name: cleanName,
       values: cleanValues,
       status,
@@ -300,6 +345,7 @@ export default function AttributePage() {
   const filteredData = attributes.filter(
     (item) =>
       item.name.toLowerCase().includes(search.toLowerCase()) ||
+      item.category_name.toLowerCase().includes(search.toLowerCase()) ||
       item.values.some((value) =>
         value.toLowerCase().includes(search.toLowerCase())
       )
@@ -461,6 +507,10 @@ export default function AttributePage() {
                 </th>
 
                 <th className="px-5 py-4 font-semibold">
+                  Category
+                </th>
+
+                <th className="px-5 py-4 font-semibold">
                   Total Values
                 </th>
 
@@ -480,7 +530,7 @@ export default function AttributePage() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center py-12 text-gray-500"
                   >
                     Loading attributes...
@@ -507,6 +557,12 @@ export default function AttributePage() {
 
                         
                       </div>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <span className="bg-blue-50 text-blue-700 border border-blue-100 px-3 py-1 rounded-full text-xs font-medium">
+                        {item.category_name || "N/A"}
+                      </span>
                     </td>
 
                     <td className="px-5 py-4">
@@ -570,7 +626,7 @@ export default function AttributePage() {
 
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center py-12 text-gray-500"
                   >
                     <Tags
@@ -706,6 +762,33 @@ export default function AttributePage() {
               onSubmit={handleSubmit}
               className="p-5 space-y-5"
             >
+
+              {/* CATEGORY */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category *
+                </label>
+
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  required
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-amber-400"
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.category_name}
+                    </option>
+                  ))}
+                </select>
+
+                {categories.length === 0 && (
+                  <p className="text-xs text-red-500 mt-1">
+                    No categories found. Please add a category first.
+                  </p>
+                )}
+              </div>
 
               {/* ATTRIBUTE NAME */}
               <div>

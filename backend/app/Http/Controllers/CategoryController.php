@@ -26,6 +26,26 @@ class CategoryController extends Controller
         ], 200);
     }
 
+    // PUBLIC: Category List with Subcategories
+public function publicMenuCategories()
+{
+    $categories = Category::where('status', 'Active')
+        ->with([
+            'subCategories' => function ($query) {
+                $query->where('status', 'Active')
+                      ->orderBy('sub_category_name', 'asc');
+            }
+        ])
+        ->orderBy('category_name', 'asc')
+        ->get();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Menu categories fetched successfully',
+        'data' => $categories,
+    ], 200);
+}
+
     // POST: Add Category
     public function store(Request $request)
     {

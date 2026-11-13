@@ -35,16 +35,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Vendor CRUD Routes
     Route::apiResource('vendors', VendorController::class);
-
     // Units CRUD Routes
     Route::apiResource('units', UnitController::class);
-
     // Category CRUD Routes
     Route::apiResource('categories', CategoryController::class);
-
     // Sub-Category CRUD Routes
     Route::apiResource('sub-categories', SubCategoryController::class);
-
     // Brand Routes
     Route::get('/brands', [BrandController::class, 'index']);
     Route::post('/brands', [BrandController::class, 'store']);
@@ -54,7 +50,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Attribute Master
     Route::apiResource('attributes', AttributeController::class);
-
     // Attribute Values
     Route::get('attribute-values', [AttributeValueController::class, 'index']);
     Route::get('attribute-values/{id}', [AttributeValueController::class, 'show']);
@@ -69,6 +64,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
     // purchases  
+    Route::get('/purchases/vendors', [PurchaseController::class, 'vendors']);
+    Route::get('/purchases/products', [PurchaseController::class, 'products']);
     Route::get('/purchases', [PurchaseController::class, 'index']);
     Route::post('/purchases', [PurchaseController::class, 'store']);
     Route::get('/purchases/{id}', [PurchaseController::class, 'show']);
@@ -79,3 +76,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Logout
     Route::post('/logout', [AuthController::class, 'logout']);
 });
+
+ //  public api 
+
+ // Public Website APIs
+Route::get('/menu/categories', [CategoryController::class, 'publicMenuCategories']);
+Route::get('/menu/sub-categories', [SubCategoryController::class, 'index']);
+// Route::get('/menu/products', [ProductController::class, 'index']);

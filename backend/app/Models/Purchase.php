@@ -8,8 +8,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Purchase extends Model
 {
-    protected $table = 'purchases';
-
     protected $fillable = [
         'unique_id',
         'branch_code',
@@ -27,25 +25,15 @@ class Purchase extends Model
         'remarks',
     ];
 
-    protected $casts = [
-        'purchase_date' => 'date',
-        'subtotal' => 'decimal:2',
-        'discount' => 'decimal:2',
-        'tax' => 'decimal:2',
-        'grand_total' => 'decimal:2',
-        'paid_amount' => 'decimal:2',
-        'due_amount' => 'decimal:2',
-    ];
-
+    // Vendor Relationship
     public function vendor(): BelongsTo
     {
-        return $this->belongsTo(Vendor::class);
+        return $this->belongsTo(Vendor::class, 'vendor_id', 'id');
     }
 
+    // Purchase Items Relationship
     public function items(): HasMany
     {
-        return $this->hasMany(PurchaseItem::class);
+        return $this->hasMany(PurchaseItem::class, 'purchase_id', 'id');
     }
 }
-
-

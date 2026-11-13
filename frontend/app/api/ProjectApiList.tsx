@@ -48,24 +48,29 @@ const ProjectApiList = {
 
   // products 
   // Product Master APIs
-productList: "/products",
-productCreate: "/products",
-productDetails: (id: number | string) => `/products/${id}`,
-productUpdate: (id: number | string) => `/products/${id}`,
-productDelete: (id: number | string) => `/products/${id}`,
+  productList: "/products",
+  productCreate: "/products",
+  productDetails: (id: number | string) => `/products/${id}`,
+  productUpdate: (id: number | string) => `/products/${id}`,
+  productDelete: (id: number | string) => `/products/${id}`,
 
-// ===============================
-// PURCHASE MANAGEMENT APIs
-// ===============================
+  // ===============================
+  // PURCHASE MANAGEMENT APIs
+  // ===============================
 
-purchaseList: "/purchases",
-purchaseCreate: "/purchases",
-purchaseDetails: (id: number | string) =>
-  `/purchases/${id}`,
-purchaseUpdate: (id: number | string) =>
-  `/purchases/${id}`,
-purchaseDelete: (id: number | string) =>
-  `/purchases/${id}`,
+  purchaseList: "/purchases",
+  purchaseCreate: "/purchases",
+  // Active vendors for purchase
+  purchaseVendors: "/purchases/vendors",
+  purchaseProducts: "/purchases/products",
+  purchaseDetails: (id: number | string) => `/purchases/${id}`,
+  purchaseUpdate: (id: number | string) => `/purchases/${id}`,
+  purchaseDelete: (id: number | string) => `/purchases/${id}`,
+
+  // public main frontend 
+  menuCategories: "/menu/categories",
+  menuSubCategories: "/menu/sub-categories",
+  menuProducts: "/menu/products",
 
 
 };

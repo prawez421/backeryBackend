@@ -75,7 +75,7 @@ export default function CategoryMasterPage() {
 
       toast.error(
         error.response?.data?.message ||
-          "Category list load nahi hui"
+        "Category list load nahi hui"
       );
     } finally {
       setLoading(false);
@@ -226,7 +226,7 @@ export default function CategoryMasterPage() {
       } else {
         toast.error(
           error.response?.data?.message ||
-            "Something went wrong"
+          "Something went wrong"
         );
       }
     } finally {
@@ -238,27 +238,54 @@ export default function CategoryMasterPage() {
   const handleDelete = async () => {
     if (!selectedCategory) return;
 
-    try {
-      setSaving(true);
+   
+try {
+  setSaving(true);
 
-      await axiosInstance.delete(
-        ProjectApiList.categoryDelete(selectedCategory.id)
-      );
+  await axiosInstance.delete(
+    ProjectApiList.categoryDelete(selectedCategory.id)
+  );
 
-      toast.success("Category successfully deleted");
+  toast.success("Category deleted successfully.");
 
-      closeModal();
-      await fetchCategories();
-    } catch (error: any) {
-      console.error("Category Delete Error:", error);
+  closeModal();
+  await fetchCategories();
 
-      toast.error(
-        error.response?.data?.message ||
-          "Category delete nahi hui"
-      );
-    } finally {
-      setSaving(false);
-    }
+} catch (error: any) {
+  console.error("Category Delete Error:", error);
+
+  const status = error.response?.status;
+  const errorMessage = error.response?.data?.message;
+
+  let message = "Unable to delete category. Please try again.";
+
+  if (!error.response) {
+    message =
+      "Network error. Please check your internet connection and try again.";
+  } else if (status === 401) {
+    message = "Your session has expired. Please log in again.";
+  } else if (status === 403) {
+    message = "You do not have permission to delete this category.";
+  } else if (status === 404) {
+    message =
+      "Category not found. It may have already been deleted.";
+  } else if (status === 422) {
+    message =
+      errorMessage ||
+      "This category cannot be deleted because it is linked to existing subcategories or products.";
+  } else if (status === 500) {
+    message =
+      "A server error occurred while deleting the category. Please contact support.";
+  } else if (errorMessage) {
+    message = errorMessage;
+  }
+
+  toast.error(message);
+
+} finally {
+  setSaving(false);
+}
+
   };
 
   // CLOSE MODAL
@@ -560,7 +587,7 @@ export default function CategoryMasterPage() {
               />
             </div>
 
-         
+
 
             {/* STATUS */}
             <div>
@@ -625,7 +652,7 @@ export default function CategoryMasterPage() {
               value={selectedCategory.category_name}
             />
 
-           
+
 
             <div className="flex items-center justify-between border-b border-gray-100 py-3">
               <span className="text-sm text-gray-500">
@@ -664,9 +691,9 @@ export default function CategoryMasterPage() {
             </h3>
 
             <p className="mt-2 text-sm text-gray-500">
-              Kya aap{" "}
+              Are you sure you want to delete the{" "}
               <strong>{selectedCategory.category_name}</strong>{" "}
-              category delete karna chahte hain?
+              category?
             </p>
 
             <div className="mt-6 flex justify-center gap-3">
@@ -744,11 +771,10 @@ function StatusBadge({
 }) {
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        status === "Active"
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${status === "Active"
           ? "bg-green-100 text-green-700"
           : "bg-red-100 text-red-700"
-      }`}
+        }`}
     >
       {status}
     </span>

@@ -13,6 +13,7 @@ class Attribute extends Model
     protected $fillable = [
         'unique_id',
         'branch_code',
+        'category_id',
         'attribute_name',
         'status',
     ];
@@ -27,6 +28,16 @@ class Attribute extends Model
         );
     }
 
+    // Category Relationship
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(
+            Category::class,
+            'category_id',
+            'id'
+        );
+    }
+
     // Attribute Values Relationship
     public function values(): HasMany
     {
@@ -35,4 +46,6 @@ class Attribute extends Model
             'attribute_id'
         );
     }
+
+    
 }

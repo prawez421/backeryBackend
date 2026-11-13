@@ -18,6 +18,7 @@ class AttributeController extends Controller
 
         $query = Attribute::where('branch_code', $branchCode)
             ->with([
+                'category',
                 'values' => function ($query) use ($branchCode) {
                     $query->where('branch_code', $branchCode)->latest();
                 }
@@ -32,10 +33,24 @@ class AttributeController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
 
-            $query->where('attribute_name', 'LIKE', "%{$search}%");
+            $query->where(function ($q) use ($search) {
+                $q->where('attribute_name', 'LIKE', "%{$search}%")
+                    ->orWhereHas('category', function ($categoryQuery) use ($search) {
+                        $categoryQuery->where(
+                            'category_name',
+                            'LIKE',
+                            "%{$search}%"
+                        );
+                    });
+            });
         }
 
-        // Status filter
+        // Category Filter
+        if ($request->filled('category_id')) {
+            $query->where('category_id', $request->category_id);
+        }
+
+        // Status Filter
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
@@ -51,12 +66,23 @@ class AttributeController extends Controller
         ], 200);
     }
 
+
     // POST: Create Attribute with Values
     public function store(Request $request)
     {
         $branchCode = $request->user()->branch_code;
 
         $validated = $request->validate([
+
+            // Category Validation
+            'category_id' => [
+                'required',
+                'integer',
+                Rule::exists('categories', 'id')
+                    ->where('branch_code', $branchCode),
+            ],
+
+            // Attribute Name
             'attribute_name' => [
                 'required',
                 'string',
@@ -65,11 +91,13 @@ class AttributeController extends Controller
                     ->where('branch_code', $branchCode),
             ],
 
+            // Status
             'status' => [
                 'nullable',
                 Rule::in(['Active', 'Inactive']),
             ],
 
+            // Attribute Values
             'values' => [
                 'required',
                 'array',
@@ -84,12 +112,12 @@ class AttributeController extends Controller
             ],
         ]);
 
-        // Trim values and remove extra spaces
+        // Trim Values
         $values = collect($validated['values'])
             ->map(fn ($value) => trim($value))
             ->values();
 
-        // Check empty values after trimming
+        // Check Empty Values
         if ($values->contains(fn ($value) => $value === '')) {
             return response()->json([
                 'success' => false,
@@ -97,11 +125,12 @@ class AttributeController extends Controller
             ], 422);
         }
 
-        // Check duplicate values inside this branch
-        if ($values->map(fn ($value) => mb_strtolower($value))
-            ->unique()
-            ->count() !== $values->count()) {
-
+        // Check Duplicate Values
+        if (
+            $values->map(fn ($value) => mb_strtolower($value))
+                ->unique()
+                ->count() !== $values->count()
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Duplicate attribute values are not allowed.',
@@ -113,15 +142,17 @@ class AttributeController extends Controller
             $values,
             $branchCode
         ) {
+
             // Create Attribute
             $attribute = Attribute::create([
                 'unique_id' => 'TEMP-' . Str::uuid(),
                 'branch_code' => $branchCode,
+                'category_id' => $validated['category_id'],
                 'attribute_name' => $validated['attribute_name'],
                 'status' => $validated['status'] ?? 'Active',
             ]);
 
-            // Generate ATT-0001
+            // Generate Attribute Unique ID
             $attribute->unique_id = 'ATT-' .
                 str_pad($attribute->id, 4, '0', STR_PAD_LEFT);
 
@@ -138,7 +169,7 @@ class AttributeController extends Controller
                     'status' => 'Active',
                 ]);
 
-                // Generate AV-0001
+                // Generate Value Unique ID
                 $attributeValue->unique_id = 'AV-' .
                     str_pad($attributeValue->id, 4, '0', STR_PAD_LEFT);
 
@@ -151,9 +182,10 @@ class AttributeController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Attribute created successfully',
-            'data' => $attribute->load('values'),
+            'data' => $attribute->load(['category', 'values']),
         ], 201);
     }
+
 
     // GET: Single Attribute
     public function show(Request $request, $id)
@@ -162,6 +194,7 @@ class AttributeController extends Controller
 
         $attribute = Attribute::where('branch_code', $branchCode)
             ->with([
+                'category',
                 'values' => function ($query) use ($branchCode) {
                     $query->where('branch_code', $branchCode);
                 }
@@ -180,6 +213,7 @@ class AttributeController extends Controller
         ], 200);
     }
 
+
     // PUT: Update Attribute and Values
     public function update(Request $request, $id)
     {
@@ -189,6 +223,16 @@ class AttributeController extends Controller
             ->findOrFail($id);
 
         $validated = $request->validate([
+
+            // Category Validation
+            'category_id' => [
+                'required',
+                'integer',
+                Rule::exists('categories', 'id')
+                    ->where('branch_code', $branchCode),
+            ],
+
+            // Attribute Name
             'attribute_name' => [
                 'required',
                 'string',
@@ -198,11 +242,13 @@ class AttributeController extends Controller
                     ->ignore($attribute->id),
             ],
 
+            // Status
             'status' => [
                 'nullable',
                 Rule::in(['Active', 'Inactive']),
             ],
 
+            // Attribute Values
             'values' => [
                 'required',
                 'array',
@@ -217,6 +263,7 @@ class AttributeController extends Controller
             ],
         ]);
 
+        // Trim Values
         $values = collect($validated['values'])
             ->map(fn ($value) => trim($value))
             ->values();
@@ -228,10 +275,12 @@ class AttributeController extends Controller
             ], 422);
         }
 
-        if ($values->map(fn ($value) => mb_strtolower($value))
-            ->unique()
-            ->count() !== $values->count()) {
-
+        // Check Duplicate Values
+        if (
+            $values->map(fn ($value) => mb_strtolower($value))
+                ->unique()
+                ->count() !== $values->count()
+        ) {
             return response()->json([
                 'success' => false,
                 'message' => 'Duplicate attribute values are not allowed.',
@@ -244,11 +293,15 @@ class AttributeController extends Controller
             $values,
             $branchCode
         ) {
+
+            // Update Attribute
             $attribute->update([
+                'category_id' => $validated['category_id'],
                 'attribute_name' => $validated['attribute_name'],
                 'status' => $validated['status'] ?? $attribute->status,
             ]);
 
+            // Get Existing Values
             $existingValues = AttributeValue::where(
                 'branch_code',
                 $branchCode
@@ -260,7 +313,7 @@ class AttributeController extends Controller
 
             foreach ($values as $value) {
 
-                // Find existing value without case sensitivity
+                // Find Existing Value
                 $existing = $existingValues->first(
                     fn ($item) =>
                         mb_strtolower($item->attribute_value) ===
@@ -268,16 +321,18 @@ class AttributeController extends Controller
                 );
 
                 if ($existing) {
+
                     $keepIds[] = $existing->id;
 
-                    // Keep existing ID, update text if needed
                     if ($existing->attribute_value !== $value) {
                         $existing->update([
                             'attribute_value' => $value,
                         ]);
                     }
+
                 } else {
-                    // Create new Attribute Value
+
+                    // Create New Value
                     $newValue = AttributeValue::create([
                         'unique_id' => 'TEMP-' . Str::uuid(),
                         'branch_code' => $branchCode,
@@ -295,7 +350,7 @@ class AttributeController extends Controller
                 }
             }
 
-            // Delete values removed from submitted list
+            // Delete Removed Values
             AttributeValue::where('branch_code', $branchCode)
                 ->where('attribute_id', $attribute->id)
                 ->whereNotIn('id', $keepIds)
@@ -305,9 +360,10 @@ class AttributeController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Attribute updated successfully',
-            'data' => $attribute->fresh()->load('values'),
+            'data' => $attribute->fresh()->load(['category', 'values']),
         ], 200);
     }
+
 
     // DELETE: Attribute with Values
     public function destroy(Request $request, $id)
@@ -319,7 +375,7 @@ class AttributeController extends Controller
 
         DB::transaction(function () use ($attribute) {
 
-            // Delete only this branch's values
+            // Delete Only This Branch Values
             AttributeValue::where('branch_code', $attribute->branch_code)
                 ->where('attribute_id', $attribute->id)
                 ->delete();

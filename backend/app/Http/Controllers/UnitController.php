@@ -160,9 +160,10 @@ public function store(Request $request)
 
         if (!$unit) {
             return response()->json([
-                'success' => false,
-                'message' => 'Unit not found',
-            ], 404);
+    'success' => false,
+    'message' => 'This unit is already assigned to products.',
+    'used_in' => $products,
+], 422);    
         }
 
         $unit->delete();

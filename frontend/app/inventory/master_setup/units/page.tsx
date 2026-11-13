@@ -226,28 +226,76 @@ export default function UnitMasterPage() {
   const handleDelete = async () => {
     if (!selectedUnit) return;
 
-    try {
-      setSaving(true);
+   
+try {
+  setSaving(true);
 
-      await axiosInstance.delete(
-        ProjectApiList.unitDelete(selectedUnit.id)
-      );
+  await axiosInstance.delete(
+    ProjectApiList.unitDelete(selectedUnit.id)
+  );
 
-      toast.success("Unit successfully deleted");
+  toast.success("Unit deleted successfully.");
 
-      setModalType(null);
-      setSelectedUnit(null);
+  setModalType(null);
+  setSelectedUnit(null);
 
-      await fetchUnits();
-    } catch (error: any) {
-      console.error(error);
+  await fetchUnits();
 
-      toast.error(
-        error.response?.data?.message || "Unit delete nahi hui"
-      );
-    } finally {
-      setSaving(false);
-    }
+} catch (error: any) {
+  console.error("Unit Delete Error:", error);
+
+  const status = error.response?.status;
+  const errorMessage = error.response?.data?.message;
+
+ let message = "Unable to delete unit. Please try again.";
+
+if (!error.response) {
+  message =
+    "Unable to connect to the server. Please check your internet connection and try again.";
+} else if (status === 400) {
+  message =
+    "Invalid request. Please refresh the page and try again.";
+} else if (status === 401) {
+  message =
+    "Your session has expired. Please log in again to continue.";
+} else if (status === 403) {
+  message =
+    "Access denied. You do not have permission to delete this unit.";
+} else if (status === 404) {
+  message =
+    "This unit could not be found. It may have already been deleted.";
+} else if (status === 409) {
+  message =
+    "This unit is currently in use and cannot be deleted. Please check the associated records.";
+} else if (status === 422) {
+  const products = error.response?.data?.used_in || [];
+
+  if (products.length > 0) {
+    const productNames = products
+      .map((product: any) => product.product_name)
+      .join(", ");
+
+    message = `Unable to delete this unit. It is currently used in the following products: ${productNames}.`;
+  } else {
+    message =
+      errorMessage ||
+      "This unit is already assigned to existing products. Remove or change the unit from those products before deleting it.";
+  }
+} else if (status === 500) {
+  message =
+    "Something went wrong while deleting this unit. Please try again later. If the problem continues, contact support.";
+} else if (errorMessage) {
+  message = errorMessage;
+}
+
+toast.error(message);
+
+  toast.error(message);
+
+} finally {
+  setSaving(false);
+}
+
   };
 
   // CLOSE MODAL
@@ -562,8 +610,8 @@ export default function UnitMasterPage() {
                 {saving
                   ? "Saving..."
                   : modalType === "add"
-                  ? "Save Unit"
-                  : "Update Unit"}
+                    ? "Save Unit"
+                    : "Update Unit"}
               </button>
             </div>
           </form>
@@ -619,10 +667,12 @@ export default function UnitMasterPage() {
               Are you sure?
             </h3>
 
+
+
             <p className="mt-2 text-sm text-gray-500">
-              Kya aap{" "}
-              <strong>{selectedUnit.unit_name}</strong> unit
-              delete karna chahte hain?
+              Are you sure you want to delete the{" "}
+              <strong><strong>{selectedUnit.unit_name}</strong></strong>{" "}
+              Unit
             </p>
 
             <div className="mt-6 flex justify-center gap-3">
@@ -695,11 +745,10 @@ function StatusBadge({
 }) {
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-        status === "Active"
+      className={`rounded-full px-3 py-1 text-xs font-semibold ${status === "Active"
           ? "bg-green-100 text-green-700"
           : "bg-red-100 text-red-700"
-      }`}
+        }`}
     >
       {status}
     </span>
