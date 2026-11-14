@@ -1,14 +1,18 @@
+
 "use client";
 
 import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import MenuSidebar from "@/components/main/menu/MenuSidebar";
 import MenuSearch from "@/components/main/menu/MenuSearch";
 import ProductsGrid from "@/components/main/menu/ProductsGrid";
+import ProductDetails from "@/components/main/menu/product-details";
 
 // ==========================================
 // MENU LOADING
 // ==========================================
+
 function MenuLoading() {
   return (
     <div className="flex min-h-[300px] items-center justify-center">
@@ -20,8 +24,24 @@ function MenuLoading() {
 // ==========================================
 // MENU CONTENT
 // ==========================================
+
 function MenuContent() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const searchParams = useSearchParams();
+  const productId = searchParams.get("id");
+
+  // ==========================================
+  // PRODUCT DETAILS
+  // ==========================================
+
+  if (productId) {
+    return <ProductDetails />;
+  }
+
+  // ==========================================
+  // MENU PAGE
+  // ==========================================
 
   return (
     <main className="min-h-screen bg-[#fffaf7]">
@@ -36,9 +56,8 @@ function MenuContent() {
           py-4
         "
       >
-        {/* ==========================================
-            DESKTOP STICKY SIDEBAR
-        =========================================== */}
+        {/* DESKTOP STICKY SIDEBAR */}
+
         <aside
           className="
             sticky
@@ -71,9 +90,8 @@ function MenuContent() {
           </div>
         </aside>
 
-        {/* ==========================================
-            MOBILE SIDEBAR
-        =========================================== */}
+        {/* MOBILE SIDEBAR */}
+
         <div className="lg:hidden">
           <MenuSidebar
             mobileOpen={mobileSidebarOpen}
@@ -81,9 +99,8 @@ function MenuContent() {
           />
         </div>
 
-        {/* ==========================================
-            RIGHT CONTENT
-        =========================================== */}
+        {/* RIGHT CONTENT */}
+
         <div
           className="
             w-full
@@ -96,11 +113,13 @@ function MenuContent() {
           "
         >
           {/* SEARCH */}
+
           <MenuSearch
             onOpenSidebar={() => setMobileSidebarOpen(true)}
           />
 
           {/* PRODUCTS */}
+
           <ProductsGrid />
         </div>
       </section>
@@ -111,6 +130,7 @@ function MenuContent() {
 // ==========================================
 // MAIN PAGE WITH SUSPENSE
 // ==========================================
+
 export default function MenuPage() {
   return (
     <Suspense fallback={<MenuLoading />}>

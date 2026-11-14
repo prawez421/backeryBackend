@@ -215,6 +215,8 @@ export default function PurchasePage() {
       selling_price: String(item.selling_price ?? 0),
       discount: String(item.discount ?? 0),
       tax: String(item.tax ?? 0),
+      // Previously saved attribute selections
+      selected_attributes: item.selected_attributes || {},
     }));
   };
 
@@ -415,6 +417,8 @@ const handleUpdateItem = (
         selling_price: Number(item.selling_price || 0),
         discount: Number(item.discount || 0),
         tax: Number(item.tax || 0),
+        // Send selected attributes to Laravel
+        selected_attributes: item.selected_attributes || {},
       })),
     };
 

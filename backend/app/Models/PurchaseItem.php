@@ -11,6 +11,7 @@ class PurchaseItem extends Model
         'purchase_id',
         'product_id',
         'quantity',
+        'selected_attributes',
         'purchase_price',
         'mrp',
         'selling_price',
@@ -30,4 +31,9 @@ class PurchaseItem extends Model
     {
         return $this->belongsTo(Product::class, 'product_id', 'id');
     }
+
+    protected $casts = [
+    'selected_attributes' => 'array',
+];
+
 }

@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -12,6 +11,9 @@ import {
   Wallet,
   Package,
   Pencil,
+  Check,
+  Tag,
+  AlertCircle,
 } from "lucide-react";
 
 // ==========================================
@@ -27,6 +29,7 @@ export interface PurchaseAttributeValue {
   id?: number;
   attribute_value?: string;
   value?: string;
+  name?: string;
 }
 
 export interface PurchaseAttribute {
@@ -40,24 +43,28 @@ export interface PurchaseAttribute {
 export interface PurchaseProduct {
   id: number;
   product_name: string;
+  category_id?: number;
   sku?: string;
-  // Product API should include the attributes assigned to this product.
   attributes?: PurchaseAttribute[];
   category?: {
+    id?: number;
+    category_name?: string;
     attributes?: PurchaseAttribute[];
   };
 }
 
+
+
 export interface PurchaseItemForm {
-  rowId: number;
-  product_id: string;
-  quantity: string;
-  purchase_price: string;
-  mrp: string;
-  selling_price: string;
-  discount: string;
-  tax: string;
-  selected_attributes?: Record<string, string>;
+    rowId: number;
+    product_id: string;
+    quantity: string;
+    purchase_price: string;
+    mrp: string;
+    selling_price: string;
+    discount: string;
+    tax: string;
+    selected_attributes?: Record<string, string>;
 }
 
 type NewPurchaseItem = Omit<PurchaseItemForm, "rowId">;
@@ -108,7 +115,7 @@ const emptyDraft: NewPurchaseItem = {
   product_id: "",
   quantity: "1",
   purchase_price: "",
-  mrp: "",  
+  mrp: "",
   selling_price: "",
   discount: "0",
   tax: "0",
@@ -120,9 +127,9 @@ const emptyDraft: NewPurchaseItem = {
 // ==========================================
 
 const inputClass =
-  "mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-amber-500 focus:ring-2 focus:ring-amber-100 disabled:bg-gray-100 disabled:text-gray-600";
+  "mt-2 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:ring-4 focus:ring-amber-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500";
 
-const labelClass = "block text-sm font-medium text-gray-700";
+const labelClass = "block text-sm font-semibold text-slate-700";
 
 // ==========================================
 // CURRENCY FORMAT
@@ -134,26 +141,64 @@ const money = (value: number) =>
     maximumFractionDigits: 2,
   })}`;
 
-// Normalize attribute data received from Product API.
-const getProductAttributes = (product?: PurchaseProduct): PurchaseAttribute[] => {
+// ==========================================
+// NORMALIZE PRODUCT ATTRIBUTES
+// ==========================================
+
+const getProductAttributes = (
+  product?: PurchaseProduct
+): Array<{
+  id: number;
+  attribute_name: string;
+  values: string[];
+}> => {
   if (!product) return [];
 
-  const rawAttributes =
-    product.attributes?.length
+  const rawAttributes = Array.isArray(product.category?.attributes)
+    ? product.category.attributes
+    : Array.isArray(product.attributes)
       ? product.attributes
-      : product.category?.attributes || [];
+      : [];
 
-  return rawAttributes.map((attribute: any) => ({
-    id: Number(attribute.id),
-    attribute_name:
-      attribute.attribute_name || attribute.name || `Attribute ${attribute.id}`,
-    values: (attribute.values || attribute.attribute_values || []).map(
-      (value: any) =>
-        typeof value === "string"
-          ? value
-          : value.attribute_value || value.value || ""
-    ).filter(Boolean),
-  }));
+  return rawAttributes
+    .map((attribute) => {
+      const rawValues = Array.isArray(attribute.values)
+        ? attribute.values
+        : Array.isArray(attribute.attribute_values)
+          ? attribute.attribute_values
+          : [];
+
+      const values = rawValues
+        .map((value) => {
+          if (
+            typeof value === "string" ||
+            typeof value === "number"
+          ) {
+            return String(value);
+          }
+
+          return String(
+            value?.attribute_value ??
+            value?.value ??
+            value?.name ??
+            ""
+          );
+        })
+        .filter((value) => value.trim() !== "");
+
+      return {
+        id: Number(attribute.id),
+        attribute_name:
+          attribute.attribute_name ||
+          attribute.name ||
+          `Attribute ${attribute.id}`,
+        values,
+      };
+    })
+    .filter(
+      (attribute) =>
+        Number.isFinite(attribute.id) && attribute.id > 0
+    );
 };
 
 // ==========================================
@@ -169,24 +214,45 @@ export default function PurchaseFormModal(props: Props) {
     ...emptyDraft,
   });
 
-  // Currently editing product row ID
-  const [editingRowId, setEditingRowId] = useState<number | null>(null);
+  const [editingRowId, setEditingRowId] = useState<number | null>(
+    null
+  );
+
+  const [errorMessage, setErrorMessage] = useState("");
 
   // ==========================================
-  // RESET FORM WHEN MODAL OPENS
+  // SELECTED PRODUCT
+  // ==========================================
+
+  const selectedProduct = useMemo(
+    () =>
+      props.products.find(
+        (product) => product.id === Number(draft.product_id)
+      ),
+    [props.products, draft.product_id]
+  );
+
+  const productAttributes = useMemo(
+    () => getProductAttributes(selectedProduct),
+    [selectedProduct]
+  );
+
+  // ==========================================
+  // RESET WHEN MODAL OPENS
   // ==========================================
 
   useEffect(() => {
     if (props.open) {
       setDraft({ ...emptyDraft });
       setEditingRowId(null);
+      setErrorMessage("");
     }
   }, [props.open]);
 
   if (!props.open) return null;
 
   // ==========================================
-  // UPDATE PRODUCT DRAFT
+  // UPDATE DRAFT
   // ==========================================
 
   const updateDraft = (
@@ -200,12 +266,13 @@ export default function PurchaseFormModal(props: Props) {
   };
 
   // ==========================================
-  // CANCEL PRODUCT EDIT
+  // CANCEL EDIT
   // ==========================================
 
   const handleCancelEdit = () => {
     setEditingRowId(null);
     setDraft({ ...emptyDraft });
+    setErrorMessage("");
   };
 
   // ==========================================
@@ -226,6 +293,8 @@ export default function PurchaseFormModal(props: Props) {
       selected_attributes: item.selected_attributes || {},
     });
 
+    setErrorMessage("");
+
     window.scrollTo({
       top: 0,
       behavior: "smooth",
@@ -233,12 +302,31 @@ export default function PurchaseFormModal(props: Props) {
   };
 
   // ==========================================
+  // SELECT ATTRIBUTE VALUE
+  // ==========================================
+
+  const handleSelectAttribute = (
+    attributeName: string,
+    value: string
+  ) => {
+    setDraft((prev) => ({
+      ...prev,
+      selected_attributes: {
+        ...(prev.selected_attributes || {}),
+        [attributeName]: value,
+      },
+    }));
+  };
+
+  // ==========================================
   // ADD / UPDATE PRODUCT
   // ==========================================
 
   const handleAddProduct = () => {
+    setErrorMessage("");
+
     if (!draft.product_id) {
-      alert("Please select a product.");
+      setErrorMessage("Please select a product.");
       return;
     }
 
@@ -250,7 +338,7 @@ export default function PurchaseFormModal(props: Props) {
     const tax = Number(draft.tax || 0);
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      alert("Please enter a valid quantity.");
+      setErrorMessage("Please enter a valid quantity.");
       return;
     }
 
@@ -259,7 +347,7 @@ export default function PurchaseFormModal(props: Props) {
       !Number.isFinite(purchasePrice) ||
       purchasePrice < 0
     ) {
-      alert("Please enter a valid purchase price.");
+      setErrorMessage("Please enter a valid purchase price.");
       return;
     }
 
@@ -273,22 +361,34 @@ export default function PurchaseFormModal(props: Props) {
       discount < 0 ||
       tax < 0
     ) {
-      alert("Please enter valid price, discount and tax.");
+      setErrorMessage(
+        "Please enter valid price, discount, and tax values."
+      );
+      return;
+    }
+
+    // Validate attribute selection
+    const missingAttribute = productAttributes.find(
+      (attribute) =>
+        !draft.selected_attributes?.[attribute.attribute_name]
+    );
+
+    if (missingAttribute) {
+      setErrorMessage(
+        `Please select ${missingAttribute.attribute_name}.`
+      );
       return;
     }
 
     if (editingRowId !== null) {
-      // Update existing row
       props.onUpdateItem(editingRowId, { ...draft });
-
       setEditingRowId(null);
     } else {
-      // Add new row
       props.onAddItem({ ...draft });
     }
 
-    // Reset product form
     setDraft({ ...emptyDraft });
+    setErrorMessage("");
   };
 
   // ==========================================
@@ -320,8 +420,7 @@ export default function PurchaseFormModal(props: Props) {
   const totalDiscount =
     itemDiscount + Number(props.discount || 0);
 
-  const totalTax =
-    itemTax + Number(props.tax || 0);
+  const totalTax = itemTax + Number(props.tax || 0);
 
   const paid = Number(props.paidAmount || 0);
 
@@ -334,13 +433,13 @@ export default function PurchaseFormModal(props: Props) {
 
   const paymentColor =
     paymentStatus === "Paid"
-      ? "bg-green-50 text-green-700"
+      ? "bg-emerald-50 text-emerald-700"
       : paymentStatus === "Partial"
         ? "bg-amber-50 text-amber-700"
         : "bg-red-50 text-red-700";
 
   // ==========================================
-  // PRODUCT ROW TOTAL
+  // PRODUCT TOTAL
   // ==========================================
 
   const getItemTotal = (item: PurchaseItemForm) => {
@@ -351,8 +450,8 @@ export default function PurchaseFormModal(props: Props) {
     return Math.max(
       0,
       base -
-        Number(item.discount || 0) +
-        Number(item.tax || 0)
+      Number(item.discount || 0) +
+      Number(item.tax || 0)
     );
   };
 
@@ -364,27 +463,27 @@ export default function PurchaseFormModal(props: Props) {
     <div
       className={
         isCreate
-          ? "w-full min-h-[calc(100vh-80px)] bg-slate-50"
-          : "fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 p-2 backdrop-blur-sm sm:p-5"
+          ? "min-h-[calc(100vh-80px)] w-full bg-slate-50"
+          : "fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-2 backdrop-blur-sm sm:p-5"
       }
     >
       <div
         className={
           isCreate
             ? "mx-auto flex min-h-[calc(100vh-80px)] w-full flex-col overflow-hidden bg-slate-50"
-            : "flex max-h-[96vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            : "flex max-h-[96vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-slate-50 shadow-2xl"
         }
       >
         {/* HEADER */}
 
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-4 shadow-sm sm:px-7">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-4 sm:px-7">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <ShoppingBag size={22} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+              <ShoppingBag size={23} />
             </div>
 
             <div>
-              <h2 className="text-lg font-bold text-gray-900">
+              <h2 className="text-lg font-bold text-slate-900">
                 {isView
                   ? "View Purchase"
                   : isEdit
@@ -392,12 +491,12 @@ export default function PurchaseFormModal(props: Props) {
                     : "Create Purchase"}
               </h2>
 
-              <p className="text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500">
                 {isView
-                  ? "Purchase details and payment information."
+                  ? "Review purchase and payment details."
                   : isEdit
-                    ? "Update vendor invoice and purchased products."
-                    : "Create a new purchase with vendor and products."}
+                    ? "Update purchase information and products."
+                    : "Add vendor details and purchased products."}
               </p>
             </div>
           </div>
@@ -406,7 +505,7 @@ export default function PurchaseFormModal(props: Props) {
             type="button"
             onClick={props.onClose}
             disabled={props.saving}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
             title={isCreate ? "Back to purchases" : "Close"}
           >
             {isCreate ? (
@@ -429,25 +528,39 @@ export default function PurchaseFormModal(props: Props) {
               return;
             }
 
+            if (editingRowId !== null) {
+              e.preventDefault();
+              setErrorMessage(
+                "Please update or cancel the product currently being edited."
+              );
+              return;
+            }
+
             props.onSubmit(e);
           }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex-1 space-y-6 overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-7">
+          <div className="flex-1 space-y-6 overflow-y-auto p-4 sm:p-6 lg:p-7">
 
             {/* PURCHASE INFORMATION */}
 
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-5 flex items-center gap-2 border-b pb-3">
-                <Receipt size={18} className="text-amber-600" />
+              <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-4">
+                <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+                  <Receipt size={19} />
+                </div>
 
-                <h3 className="font-semibold text-gray-800">
-                  Purchase Information
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    Purchase Information
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Enter vendor and invoice information.
+                  </p>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
                 <label className={labelClass}>
                   Vendor *
 
@@ -499,40 +612,36 @@ export default function PurchaseFormModal(props: Props) {
                     className={inputClass}
                   />
                 </label>
-
               </div>
             </section>
 
-            {/* ADD / EDIT PRODUCT FORM */}
+            {/* PRODUCT FORM */}
 
             {!isView && (
-              <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
-
-                <div className="mb-5 flex items-center gap-3 border-b pb-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+              <section className="overflow-visible rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-4">
+                  <div className="rounded-xl bg-amber-100 p-2.5 text-amber-700">
                     {editingRowId !== null ? (
-                      <Pencil size={20} />
+                      <Pencil size={21} />
                     ) : (
-                      <Package size={20} />
+                      <Package size={21} />
                     )}
                   </div>
 
                   <div>
-                    <h3 className="font-semibold text-gray-800">
+                    <h3 className="font-bold text-slate-800">
                       {editingRowId !== null
                         ? "Edit Purchase Product"
                         : "Add Purchase Product"}
                     </h3>
 
-                    <p className="text-xs text-gray-500">
-                      {editingRowId !== null
-                        ? "Update the selected product details."
-                        : "Enter product details and click Add Product."}
+                    <p className="mt-1 text-xs text-slate-500">
+                      Select a product, choose its attributes, and enter pricing.
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
                   {/* PRODUCT */}
 
@@ -549,6 +658,8 @@ export default function PurchaseFormModal(props: Props) {
                           product_id: e.target.value,
                           selected_attributes: {},
                         }));
+
+                        setErrorMessage("");
                       }}
                       className={inputClass}
                     >
@@ -562,41 +673,68 @@ export default function PurchaseFormModal(props: Props) {
                     </select>
                   </label>
 
-                  {/* PRODUCT ATTRIBUTES */}
-                  {getProductAttributes(
-                    props.products.find(
-                      (product) => product.id === Number(draft.product_id)
-                    )
-                  ).map((attribute) => {
-                    const attributeKey = String(attribute.id);
-                    const attributeValues = (attribute.values || []) as string[];
+                  {/* CLICKABLE ATTRIBUTE FIELDS */}
+
+                  {productAttributes.map((attribute) => {
+                    const attributeId = String(attribute.id);
+
+                    const selectedValue =
+                      draft.selected_attributes?.[attribute.attribute_name] || "";
 
                     return (
-                      <label key={attribute.id} className={labelClass}>
-                        {attribute.attribute_name}
+                      <div
+                        key={attribute.id}
+                        className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <label className="mb-3 block text-sm font-bold text-slate-700">
+                          {attribute.attribute_name}
+                          <span className="ml-1 text-red-500">*</span>
+                        </label>
 
-                        <select
-                          disabled={props.saving}
-                          value={draft.selected_attributes?.[attributeKey] || ""}
-                          onChange={(e) =>
-                            setDraft((prev) => ({
-                              ...prev,
-                              selected_attributes: {
-                                ...(prev.selected_attributes || {}),
-                                [attributeKey]: e.target.value,
-                              },
-                            }))
-                          }
-                          className={inputClass}
-                        >
-                          <option value="">Select {attribute.attribute_name}</option>
-                          {attributeValues.map((value, index) => (
-                            <option key={`${attribute.id}-${index}`} value={value}>
-                              {value}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                        <div className="flex flex-wrap gap-2">
+                          {attribute.values.length ? (
+                            attribute.values.map((value, index) => {
+                              const isSelected =
+                                draft.selected_attributes?.[attribute.attribute_name] === value;
+
+                              return (
+                                <button
+                                  key={`${attribute.id}-${index}`}
+                                  type="button"
+                                  disabled={props.saving}
+                                  onClick={() =>
+                                    handleSelectAttribute(
+                                      attribute.attribute_name,
+                                      value
+                                    )
+                                  }
+                                  className={`rounded-lg border px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${isSelected
+                                    ? "border-amber-600 bg-amber-600 text-white shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-700 hover:border-amber-400 hover:bg-amber-50"
+                                    }`}
+                                >
+                                  {value}
+
+                                  {isSelected && (
+                                    <Check
+                                      size={15}
+                                      className="ml-2 inline-block"
+                                    />
+                                  )}
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <p className="text-xs text-slate-400">
+                              No values available.
+                            </p>
+                          )}
+                        </div>
+
+                        <p className="mt-3 text-xs text-slate-500">
+                          Selected: {selectedValue || "Not selected"}
+                        </p>
+                      </div>
                     );
                   })}
 
@@ -614,6 +752,7 @@ export default function PurchaseFormModal(props: Props) {
                       onChange={(e) =>
                         updateDraft("quantity", e.target.value)
                       }
+                      placeholder="Enter quantity"
                       className={inputClass}
                     />
                   </label>
@@ -630,7 +769,10 @@ export default function PurchaseFormModal(props: Props) {
                       disabled={props.saving}
                       value={draft.purchase_price}
                       onChange={(e) =>
-                        updateDraft("purchase_price", e.target.value)
+                        updateDraft(
+                          "purchase_price",
+                          e.target.value
+                        )
                       }
                       placeholder="0.00"
                       className={inputClass}
@@ -689,6 +831,7 @@ export default function PurchaseFormModal(props: Props) {
                       onChange={(e) =>
                         updateDraft("discount", e.target.value)
                       }
+                      placeholder="0.00"
                       className={inputClass}
                     />
                   </label>
@@ -707,92 +850,136 @@ export default function PurchaseFormModal(props: Props) {
                       onChange={(e) =>
                         updateDraft("tax", e.target.value)
                       }
+                      placeholder="0.00"
                       className={inputClass}
                     />
                   </label>
-
-                  {/* ACTION BUTTONS */}
-
-                  <div className="flex items-end gap-2">
-                    <button
-                      type="button"
-                      onClick={handleAddProduct}
-                      disabled={
-                        props.saving ||
-                        !props.products.length
-                      }
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:opacity-50"
-                    >
-                      {editingRowId !== null ? (
-                        <>
-                          <Pencil size={17} />
-                          Update Product
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={17} />
-                          Add Product
-                        </>
-                      )}
-                    </button>
-
-                    {editingRowId !== null && (
-                      <button
-                        type="button"
-                        onClick={handleCancelEdit}
-                        disabled={props.saving}
-                        className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-
                 </div>
 
-                {!props.products.length && (
-                  <p className="mt-3 text-xs text-red-500">
-                    No active products available.
-                  </p>
+                {/* SELECTED ATTRIBUTES */}
+
+                {productAttributes.length > 0 && (
+                  <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50/50 p-4">
+                    <div className="mb-3 flex items-center gap-2">
+                      <Tag
+                        size={16}
+                        className="text-amber-700"
+                      />
+
+                      <p className="text-xs font-bold uppercase tracking-wide text-amber-800">
+                        Selected Product Attributes
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {productAttributes.map((attribute) => {
+                        const value =
+                          draft.selected_attributes?.[attribute.attribute_name];
+                        return (
+                          <span
+                            key={attribute.id}
+                            className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs font-medium text-slate-700"
+                          >
+                            <span className="text-slate-400">
+                              {attribute.attribute_name}:
+                            </span>{" "}
+                            {value || "Not selected"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
 
-                {!!draft.product_id &&
-                  getProductAttributes(
-                    props.products.find(
-                      (product) => product.id === Number(draft.product_id)
-                    )
-                  ).length === 0 && (
-                    <p className="mt-3 text-xs text-amber-700">
-                      Is product ke liye koi attribute configured nahi hai.
-                    </p>
+                {/* ERROR MESSAGE */}
+
+                {errorMessage && (
+                  <div className="mt-5 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <AlertCircle
+                      size={18}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
+                {/* NO PRODUCTS */}
+
+                {!props.products.length && (
+                  <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
+                    No active products are available. Please check your product list.
+                  </div>
+                )}
+
+                {/* NO ATTRIBUTES */}
+
+                {selectedProduct &&
+                  productAttributes.length === 0 && (
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                      No attributes are available for this product.
+                    </div>
                   )}
+
+                {/* ACTION BUTTONS */}
+
+                <div className="mt-6 flex flex-col justify-end gap-3 border-t border-slate-100 pt-5 sm:flex-row">
+                  {editingRowId !== null && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      disabled={props.saving}
+                      className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleAddProduct}
+                    disabled={
+                      props.saving || !props.products.length
+                    }
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-7 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {editingRowId !== null ? (
+                      <>
+                        <Check size={18} />
+                        Update Product
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={19} />
+                        Add Product
+                      </>
+                    )}
+                  </button>
+                </div>
               </section>
             )}
 
             {/* ADDED PRODUCTS */}
 
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-              <div className="flex items-center justify-between border-b p-5">
+              <div className="flex flex-col justify-between gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center">
                 <div>
-                  <h3 className="font-semibold text-gray-800">
+                  <h3 className="font-bold text-slate-800">
                     Added Products
                   </h3>
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    Products added to this purchase.
+                  <p className="mt-1 text-xs text-slate-500">
+                    Review all products included in this purchase.
                   </p>
                 </div>
 
-                <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
+                <span className="w-fit rounded-full bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700">
                   {props.items.length} Products
                 </span>
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[950px] text-left text-sm">
-
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <table className="w-full min-w-[1050px] text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       {[
                         "S.No",
@@ -807,101 +994,98 @@ export default function PurchaseFormModal(props: Props) {
                         "Total",
                         ...(!isView ? ["Action"] : []),
                       ].map((heading) => (
-                        <th key={heading} className="px-3 py-4">
+                        <th
+                          key={heading}
+                          className="whitespace-nowrap px-4 py-4 font-bold"
+                        >
                           {heading}
                         </th>
                       ))}
                     </tr>
                   </thead>
 
-                  <tbody className="divide-y divide-gray-100">
-
+                  <tbody className="divide-y divide-slate-100">
                     {props.items.map((item, index) => {
                       const product = props.products.find(
-                        (p) => p.id === Number(item.product_id)
+                        (p) =>
+                          p.id === Number(item.product_id)
                       );
+
+                      const attributes = getProductAttributes(product);
+
+                     const savedAttributes = item.selected_attributes || {};
 
                       return (
                         <tr
                           key={item.rowId}
-                          className="hover:bg-amber-50/30"
+                          className="transition hover:bg-amber-50/30"
                         >
-                          <td className="px-3 py-4 text-gray-500">
+                          <td className="px-4 py-4 text-slate-500">
                             {index + 1}
                           </td>
 
-                          <td className="px-3 py-4 font-medium text-gray-800">
+                          <td className="px-4 py-4 font-semibold text-slate-800">
                             {product?.product_name ||
                               `Product #${item.product_id}`}
                           </td>
 
-                          <td className="px-3 py-4">
-                            {item.selected_attributes &&
-                            Object.keys(item.selected_attributes).length > 0 ? (
-                              <div className="flex min-w-[150px] flex-wrap gap-1.5">
-                                {Object.entries(item.selected_attributes).map(
-                                  ([attributeId, value]) => {
-                                    const attribute = getProductAttributes(product).find(
-                                      (entry) => entry.id === Number(attributeId)
-                                    );
+                         <td className="px-4 py-4">
+    {Object.keys(savedAttributes).length > 0 ? (
+        <div className="flex min-w-[150px] flex-wrap gap-1.5">
+            {Object.entries(savedAttributes).map(
+                ([attributeName, value]) => (
+                    <span
+                        key={attributeName}
+                        className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800"
+                    >
+                        {attributeName}: {value}
+                    </span>
+                )
+            )}
+        </div>
+    ) : (
+        <span className="text-slate-400">—</span>
+    )}
+</td>
 
-                                    return (
-                                      <span
-                                        key={attributeId}
-                                        className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800"
-                                      >
-                                        {attribute?.attribute_name || `Attribute ${attributeId}`}: {value}
-                                      </span>
-                                    );
-                                  }
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </td>
-
-                          <td className="px-3 py-4">
+                          <td className="px-4 py-4 text-slate-700">
                             {item.quantity}
                           </td>
 
-                          <td className="px-3 py-4">
+                          <td className="px-4 py-4 text-slate-700">
                             {money(Number(item.purchase_price))}
                           </td>
 
-                          <td className="px-3 py-4">
+                          <td className="px-4 py-4 text-slate-700">
                             {money(Number(item.mrp))}
                           </td>
 
-                          <td className="px-3 py-4">
+                          <td className="px-4 py-4 text-slate-700">
                             {money(Number(item.selling_price))}
                           </td>
 
-                          <td className="px-3 py-4 text-red-600">
+                          <td className="px-4 py-4 text-red-600">
                             {money(Number(item.discount))}
                           </td>
 
-                          <td className="px-3 py-4">
+                          <td className="px-4 py-4 text-slate-700">
                             {money(Number(item.tax))}
                           </td>
 
-                          <td className="px-3 py-4 font-semibold">
+                          <td className="px-4 py-4 font-bold text-slate-900">
                             {money(getItemTotal(item))}
                           </td>
 
-                          {/* EDIT AND DELETE */}
-
                           {!isView && (
-                            <td className="px-3 py-4">
+                            <td className="px-4 py-4">
                               <div className="flex items-center gap-2">
-
                                 <button
                                   type="button"
                                   disabled={props.saving}
                                   onClick={() =>
                                     handleEditProduct(item)
                                   }
-                                  className="rounded-lg p-2 text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                                  className="rounded-lg p-2 text-blue-600 transition hover:bg-blue-50 disabled:opacity-50"
                                   title="Edit product"
                                 >
                                   <Pencil size={17} />
@@ -913,12 +1097,11 @@ export default function PurchaseFormModal(props: Props) {
                                   onClick={() =>
                                     handleDeleteProduct(item.rowId)
                                   }
-                                  className="rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                                  className="rounded-lg p-2 text-red-500 transition hover:bg-red-50 disabled:opacity-50"
                                   title="Remove product"
                                 >
                                   <Trash2 size={17} />
                                 </button>
-
                               </div>
                             </td>
                           )}
@@ -930,45 +1113,48 @@ export default function PurchaseFormModal(props: Props) {
                       <tr>
                         <td
                           colSpan={isView ? 10 : 11}
-                          className="px-4 py-14 text-center"
+                          className="px-4 py-16 text-center"
                         >
-                          <Package
-                            size={35}
-                            className="mx-auto mb-3 text-gray-300"
-                          />
+                          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                            <Package size={27} />
+                          </div>
 
-                          <p className="font-medium text-gray-600">
-                            No products added yet
+                          <p className="font-semibold text-slate-600">
+                            No Products Added
                           </p>
 
-                          <p className="mt-1 text-xs text-gray-400">
-                            Add your first product using the form above.
+                          <p className="mt-1 text-xs text-slate-400">
+                            Select a product and click Add Product to get started.
                           </p>
                         </td>
                       </tr>
                     )}
-
                   </tbody>
                 </table>
               </div>
             </section>
 
-            {/* REMARKS AND PAYMENT SUMMARY */}
+            {/* REMARKS AND PAYMENT */}
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
 
               {/* REMARKS */}
 
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h3 className="mb-4 font-semibold text-gray-800">
-                  Additional Information
-                </h3>
+                <div className="mb-5 border-b border-slate-100 pb-4">
+                  <h3 className="font-bold text-slate-800">
+                    Additional Information
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Add any notes related to this purchase.
+                  </p>
+                </div>
 
                 <label className={labelClass}>
                   Remarks
 
                   <textarea
-                    rows={5}
+                    rows={6}
                     disabled={isView || props.saving}
                     value={props.remarks}
                     onChange={(e) =>
@@ -983,27 +1169,37 @@ export default function PurchaseFormModal(props: Props) {
               {/* PAYMENT SUMMARY */}
 
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-4">
+                  <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
+                    <Wallet size={19} />
+                  </div>
 
-                <div className="mb-5 flex items-center gap-2 border-b pb-3">
-                  <Wallet size={19} className="text-amber-600" />
-
-                  <h3 className="font-semibold text-gray-800">
-                    Payment Summary
-                  </h3>
+                  <div>
+                    <h3 className="font-bold text-slate-800">
+                      Payment Summary
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Review purchase totals and payment details.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="space-y-4 text-sm">
-
                   <div className="flex justify-between">
-                    <span className="text-gray-500">
+                    <span className="text-slate-500">
                       Subtotal
                     </span>
 
-                    <strong>{money(props.subtotal)}</strong>
+                    <strong className="text-slate-800">
+                      {money(props.subtotal)}
+                    </strong>
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <label htmlFor="purchase-discount">
+                    <label
+                      htmlFor="purchase-discount"
+                      className="text-slate-600"
+                    >
                       Overall Discount
                     </label>
 
@@ -1017,12 +1213,15 @@ export default function PurchaseFormModal(props: Props) {
                       onChange={(e) =>
                         props.setDiscount(e.target.value)
                       }
-                      className="w-28 rounded-lg border px-3 py-2 text-right disabled:bg-gray-100"
+                      className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-right outline-none focus:border-amber-500 disabled:bg-slate-100"
                     />
                   </div>
 
                   <div className="flex items-center justify-between gap-3">
-                    <label htmlFor="purchase-tax">
+                    <label
+                      htmlFor="purchase-tax"
+                      className="text-slate-600"
+                    >
                       Overall Tax
                     </label>
 
@@ -1036,12 +1235,12 @@ export default function PurchaseFormModal(props: Props) {
                       onChange={(e) =>
                         props.setTax(e.target.value)
                       }
-                      className="w-28 rounded-lg border px-3 py-2 text-right disabled:bg-gray-100"
+                      className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-right outline-none focus:border-amber-500 disabled:bg-slate-100"
                     />
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-gray-500">
+                    <span className="text-slate-500">
                       Total Discount
                     </span>
 
@@ -1051,19 +1250,21 @@ export default function PurchaseFormModal(props: Props) {
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-gray-500">
+                    <span className="text-slate-500">
                       Total Tax
                     </span>
 
-                    <strong>{money(totalTax)}</strong>
+                    <strong className="text-slate-800">
+                      {money(totalTax)}
+                    </strong>
                   </div>
 
-                  <div className="flex justify-between border-t pt-4">
-                    <span className="font-semibold">
+                  <div className="flex justify-between border-t border-slate-100 pt-4">
+                    <span className="font-bold text-slate-800">
                       Grand Total
                     </span>
 
-                    <strong className="text-xl text-amber-600">
+                    <strong className="text-xl font-bold text-amber-600">
                       {money(props.grandTotal)}
                     </strong>
                   </div>
@@ -1086,25 +1287,26 @@ export default function PurchaseFormModal(props: Props) {
                   </label>
 
                   <div className="flex justify-between">
-                    <span className="text-gray-500">
+                    <span className="text-slate-500">
                       Due Amount
                     </span>
 
-                    <strong className="text-red-600">
+                    <strong className="font-bold text-red-600">
                       {money(props.dueAmount)}
                     </strong>
                   </div>
 
-                  <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3">
-                    <span>Payment Status</span>
+                  <div className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
+                    <span className="font-semibold text-slate-600">
+                      Payment Status
+                    </span>
 
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${paymentColor}`}
+                      className={`rounded-full px-3 py-1.5 text-xs font-bold ${paymentColor}`}
                     >
                       {paymentStatus}
                     </span>
                   </div>
-
                 </div>
               </section>
             </div>
@@ -1112,13 +1314,12 @@ export default function PurchaseFormModal(props: Props) {
 
           {/* FOOTER */}
 
-          <div className="flex shrink-0 flex-col-reverse justify-end gap-3 border-t border-slate-200 bg-white px-5 py-4 shadow-[0_-4px_16px_rgba(15,23,42,0.04)] sm:flex-row sm:px-7">
-
+          <div className="flex shrink-0 flex-col-reverse justify-end gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:px-7">
             <button
               type="button"
               onClick={props.onClose}
               disabled={props.saving}
-              className="rounded-lg border px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="rounded-xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
             >
               {isView ? "Close" : "Cancel"}
             </button>
@@ -1133,7 +1334,7 @@ export default function PurchaseFormModal(props: Props) {
                   !props.items.length ||
                   !props.products.length
                 }
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-7 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-7 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {props.saving
                   ? "Saving Purchase..."
@@ -1142,7 +1343,6 @@ export default function PurchaseFormModal(props: Props) {
                     : "Save Purchase"}
               </button>
             )}
-
           </div>
         </form>
       </div>

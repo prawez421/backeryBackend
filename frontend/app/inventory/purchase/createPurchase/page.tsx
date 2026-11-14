@@ -167,23 +167,25 @@ export default function CreatePurchasePage() {
     setNextRowId((prev) => prev + 1);
   };
 
+  // ==========================================
+  // UPDATE PURCHASE ITEM
+  // ==========================================
 
-const handleUpdateItem = (
-  rowId: number,
-  updatedItem: Omit<PurchaseItemForm, "rowId">
-) => {
-  setItems((prev) =>
-    prev.map((item) =>
-      item.rowId === rowId
-        ? {
-            ...updatedItem,
-            rowId,
-          }
-        : item
-    )
-  );
-};
-
+  const handleUpdateItem = (
+    rowId: number,
+    updatedItem: Omit<PurchaseItemForm, "rowId">
+  ) => {
+    setItems((prev) =>
+      prev.map((item) =>
+        item.rowId === rowId
+          ? {
+              ...updatedItem,
+              rowId,
+            }
+          : item
+      )
+    );
+  };
 
   // ==========================================
   // 3. REMOVE PURCHASE ITEM
@@ -276,7 +278,9 @@ const handleUpdateItem = (
     );
 
     if (invalidItem) {
-      alert("Please enter valid product, quantity and purchase price.");
+      alert(
+        "Please enter valid product, quantity and purchase price."
+      );
       return;
     }
 
@@ -319,6 +323,9 @@ const handleUpdateItem = (
         selling_price: Number(item.selling_price || 0),
         discount: Number(item.discount || 0),
         tax: Number(item.tax || 0),
+
+        // Selected attributes
+        selected_attributes: item.selected_attributes || {},
       })),
     };
 
@@ -328,6 +335,8 @@ const handleUpdateItem = (
 
     try {
       setSaving(true);
+
+      console.log("Purchase Payload:", payload);
 
       const response = await axiosInstance.post(
         ProjectApiList.purchaseCreate,
@@ -431,7 +440,7 @@ const handleUpdateItem = (
           setRemarks={setRemarks}
 
           onAddItem={handleAddItem}
-           onUpdateItem={handleUpdateItem}
+          onUpdateItem={handleUpdateItem}
           onRemoveItem={handleRemoveItem}
         />
       )}

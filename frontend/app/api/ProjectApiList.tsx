@@ -57,7 +57,6 @@ const ProjectApiList = {
   // ===============================
   // PURCHASE MANAGEMENT APIs
   // ===============================
-
   purchaseList: "/purchases",
   purchaseCreate: "/purchases",
   // Active vendors for purchase
@@ -67,10 +66,13 @@ const ProjectApiList = {
   purchaseUpdate: (id: number | string) => `/purchases/${id}`,
   purchaseDelete: (id: number | string) => `/purchases/${id}`,
 
-  // public main frontend 
+
+
+  // public main frontend website 
   menuCategories: "/menu/categories",
   menuSubCategories: "/menu/sub-categories",
   menuProducts: "/menu/products",
+  
 
 
 };

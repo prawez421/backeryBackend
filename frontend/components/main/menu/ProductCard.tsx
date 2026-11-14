@@ -41,6 +41,11 @@ export default function ProductCard({
 
   const [liked, setLiked] = useState(false);
   const [adding, setAdding] = useState(false);
+//  console.log(product)
+
+  const handleViewDetails = () => {
+    router.push(`/menu?id=${product.id}`);
+  };
 
   /* ===================================================
      DISCOUNT
@@ -194,24 +199,32 @@ export default function ProductCard({
           xl:h-[265px]
         "
       >
-        <Image
-          src={product.image}
-          alt={product.name}
-          fill
-          sizes="
-            (max-width: 640px) 100vw,
-            (max-width: 1280px) 50vw,
-            33vw
-          "
-          className="
-            object-cover
-            transition-transform
-            duration-[800ms]
-            ease-out
+        <button
+          type="button"
+          onClick={handleViewDetails}
+          aria-label={`View ${product.name} details`}
+          className="absolute inset-0 h-full w-full"
+        >
+          <Image
+            src={product.image}
+            alt={product.name}
+            fill
+            unoptimized
+            sizes="
+              (max-width: 640px) 100vw,
+              (max-width: 1280px) 50vw,
+              33vw
+            "
+            className="
+              object-cover
+              transition-transform
+              duration-[800ms]
+              ease-out
 
-            group-hover:scale-[1.07]
-          "
-        />
+              group-hover:scale-[1.07]
+            "
+          />
+        </button>
 
         {/* IMAGE OVERLAY */}
 
@@ -504,7 +517,13 @@ export default function ProductCard({
             group-hover:text-[#9a1e2f]
           "
         >
-          {product.name}
+          <button
+            type="button"
+            onClick={handleViewDetails}
+            className="text-left"
+          >
+            {product.name}
+          </button>
         </h3>
 
         {/* =================================================

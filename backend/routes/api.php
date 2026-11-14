@@ -82,4 +82,4 @@ Route::middleware('auth:sanctum')->group(function () {
  // Public Website APIs
 Route::get('/menu/categories', [CategoryController::class, 'publicMenuCategories']);
 Route::get('/menu/sub-categories', [SubCategoryController::class, 'index']);
-// Route::get('/menu/products', [ProductController::class, 'index']);
+Route::get('/menu/products', [PurchaseController::class, 'menuproducts']);
